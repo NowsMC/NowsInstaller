@@ -30,7 +30,9 @@ Before changing an existing `launcher_profiles.json`, it creates a sibling backu
 
 By default, the launcher profile does not set `gameDir`, so the game runs on the launcher's normal Minecraft game folder. Nows mods are discovered from that game folder's `mods` directory first, matching other loaders, and from `.minecraft/nows/profiles/nows-<nows-version>-<minecraft-version>/mods` as an optional Nows-only overlay.
 
-Use `--profileGameDir` in the CLI installer, or enable `Use profile-local game folder` in the UI installer, to make the launcher profile use `.minecraft/nows/profiles/nows-<nows-version>-<minecraft-version>/` as its game folder.
+Use `--profileGameDir` in the CLI installer to make the launcher profile use `.minecraft/nows/profiles/nows-<nows-version>-<minecraft-version>/` as its game folder. Use `--gameDir <path>` to choose a custom folder.
+
+The UI installer is the normal user-facing entrypoint. It auto-detects the Minecraft folder for Windows, macOS and Linux, allows browsing manually, and can set a custom game folder for the Nows profile.
 
 The profile icon is embedded from:
 
@@ -52,16 +54,16 @@ build/libs/NowsInstaller-ui-<version>.jar
 build/libs/NowsInstaller-offline-<version>.jar
 ```
 
+Run the UI installer with:
+
+```bash
+java -jar build/libs/NowsInstaller-ui-<version>.jar
+```
+
 Run the CLI installer with:
 
 ```bash
 java -jar build/libs/NowsInstaller-cli-<version>.jar
-```
-
-Run the Swing UI installer with:
-
-```bash
-java -jar build/libs/NowsInstaller-ui-<version>.jar
 ```
 
 Run the fully offline installer with:
@@ -90,9 +92,9 @@ Default URL:
 https://files.nows.space/releases/nows/<nows-version>/<minecraft-version>/install.properties
 ```
 
-Use `install.properties.template` as the release template. Release automation should fill SHA-256 values before publishing. For `source=internet` artifacts, the normal installer first tries `artifact.<n>.url`; if that download fails or the URL is missing, it falls back to `artifact.<n>.mavenUrl` or `mavenBaseUrl + artifact.<n>.path`.
+Use `install.properties.template` as the release template. Release automation should fill SHA-256 values before publishing. For `source=internet` artifacts, the normal installer first tries `artifact.<n>.url`; if that download fails or the URL is missing, it falls back to `artifact.<n>.mavenUrl` or `mavenBaseUrl + artifact.<n>.path`. External downloads must use HTTPS; plain HTTP is accepted only for localhost development.
 
-The manifest may also include `mod.<n>` companion mod entries. These are copied to the main `.minecraft/mods` directory. The 0.4.0 default manifest does not use this for `NowsApiMod`; the title-screen badge is provided by the required `mc/<minecraft-version>` adapter instead.
+The manifest may also include `mod.<n>` companion mod entries. These are copied to the active game folder's `mods` directory. The 0.4.0 default manifest does not use this for `NowsApiMod`; the title-screen badge is provided by the required `mc/<minecraft-version>` adapter instead.
 
 ## Fully offline installer
 
