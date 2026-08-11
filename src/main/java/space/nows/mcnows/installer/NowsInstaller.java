@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +36,8 @@ import java.util.logging.Logger;
  */
 public final class NowsInstaller {
     private static final String DEFAULTS_RESOURCE = "/META-INF/nows/installer/defaults.properties";
+    private static final String USER_AGENT = "NowsInstaller/" + defaultNowsVersion();
+    private static final int MAX_REDIRECTS = 5;
     private static final Logger LOG = logger(NowsInstaller.class);
 
     private NowsInstaller() {}
@@ -94,7 +97,7 @@ public final class NowsInstaller {
         installLauncherProfile(options, profile);
         listener.log("[NowsInstaller] launcher profiles: " + options.minecraftDir.resolve("launcher_profiles.json"));
         listener.log("[NowsInstaller] default game dir: " + options.minecraftDir);
-        listener.log("[NowsInstaller] optional profile game dir: " + profileGameDirectory(options));
+        listener.log("[NowsInstaller] profile game dir: " + profileGameDirectory(options));
         listener.log("[NowsInstaller] game mods dir: " + minecraftModsDirectory(options));
         listener.log("[NowsInstaller] optional profile mods dir: " + profileModsDirectory(options));
         listener.log("[NowsInstaller] Installed " + profile);
@@ -111,13 +114,17 @@ public final class NowsInstaller {
         String source = manifest.getProperty(prefix + "source", "internet").trim();
         String expectedSha256 = manifest.getProperty(prefix + "sha256", "").trim();
         String sourceUrl = manifest.getProperty(prefix + "url", "").trim();
+        String launcherSourceUrl = "";
+        if (!options.offline && !options.embeddedArtifacts && source.equals("internet")) {
+            launcherSourceUrl = internetArtifactUrl(manifest, prefix, relativePath, coordinate, sourceUrl);
+        }
 
         Path destination = options.minecraftDir.resolve("libraries").resolve(relativePath);
         Files.createDirectories(destination.getParent());
 
         if (Files.isRegularFile(destination) && !expectedSha256.isEmpty()
                 && sha256(destination).equalsIgnoreCase(expectedSha256)) {
-            return new InstalledLibrary(coordinate, relativePath, sourceUrl, destination);
+            return new InstalledLibrary(coordinate, relativePath, launcherSourceUrl, destination);
         }
 
         if (source.equals("embedded")) {
@@ -127,7 +134,7 @@ public final class NowsInstaller {
         } else if (options.offline) {
             copyLocalArtifact(options, manifest, prefix, relativePath, destination);
         } else if (source.equals("internet")) {
-            downloadInternetArtifact(manifest, prefix, relativePath, coordinate, sourceUrl, destination);
+            launcherSourceUrl = downloadInternetArtifact(manifest, prefix, relativePath, coordinate, sourceUrl, destination);
         } else if (source.equals("local")) {
             copyLocalArtifact(options, manifest, prefix, relativePath, destination);
         } else {
@@ -143,10 +150,10 @@ public final class NowsInstaller {
             }
         }
 
-        return new InstalledLibrary(coordinate, relativePath, options.offline || options.embeddedArtifacts ? "" : sourceUrl, destination);
+        return new InstalledLibrary(coordinate, relativePath, launcherSourceUrl, destination);
     }
 
-    private static void downloadInternetArtifact(
+    private static String downloadInternetArtifact(
             Properties manifest,
             String prefix,
             String relativePath,
@@ -157,20 +164,40 @@ public final class NowsInstaller {
         String fallbackUrl = mavenFallbackUrl(manifest, prefix, relativePath);
         if (!isBlank(sourceUrl)) {
             try {
-                download(URI.create(sourceUrl), destination);
-                return;
+                downloadInternet(sourceUrl, destination);
+                return sourceUrl;
             } catch (IOException primaryFailure) {
                 if (isBlank(fallbackUrl) || fallbackUrl.equals(sourceUrl)) {
                     throw primaryFailure;
                 }
-                download(URI.create(fallbackUrl), destination);
-                return;
+                downloadInternet(fallbackUrl, destination);
+                return fallbackUrl;
             }
         }
         if (isBlank(fallbackUrl)) {
             throw new IllegalArgumentException("Missing URL for internet artifact: " + coordinate);
         }
-        download(URI.create(fallbackUrl), destination);
+        downloadInternet(fallbackUrl, destination);
+        return fallbackUrl;
+    }
+
+    private static String internetArtifactUrl(
+            Properties manifest,
+            String prefix,
+            String relativePath,
+            String coordinate,
+            String sourceUrl
+    ) {
+        if (!isBlank(sourceUrl)) {
+            parseInternetUri(sourceUrl);
+            return sourceUrl;
+        }
+        String fallbackUrl = mavenFallbackUrl(manifest, prefix, relativePath);
+        if (isBlank(fallbackUrl)) {
+            throw new IllegalArgumentException("Missing URL for internet artifact: " + coordinate);
+        }
+        parseInternetUri(fallbackUrl);
+        return fallbackUrl;
     }
 
     private static String mavenFallbackUrl(Properties manifest, String prefix, String relativePath) {
@@ -241,7 +268,7 @@ public final class NowsInstaller {
             if (isBlank(sourceUrl)) {
                 throw new IllegalArgumentException("Missing URL for companion mod: " + fileName);
             }
-            download(URI.create(sourceUrl), destination);
+            downloadInternet(sourceUrl, destination);
         } else if (source.equals("local")) {
             copyLocalMod(options, manifest, prefix, fileName, destination);
         } else {
@@ -390,7 +417,7 @@ public final class NowsInstaller {
         profile.put("created", now.toString());
         profile.put("lastUsed", now.toString());
         profile.put("lastVersionId", versionProfile);
-        if (options.profileGameDir) {
+        if (options.usesProfileGameDir()) {
             profile.put("gameDir", gameDir.toString());
         }
         String icon = launcherIcon();
@@ -401,10 +428,16 @@ public final class NowsInstaller {
     }
 
     private static Path profileGameDirectory(Options options) {
+        if (options.gameDir != null) {
+            return options.gameDir;
+        }
         return options.minecraftDir.resolve("nows").resolve("profiles").resolve(profileId(options));
     }
 
     private static Path minecraftModsDirectory(Options options) {
+        if (options.usesProfileGameDir()) {
+            return profileModsDirectory(options);
+        }
         return options.minecraftDir.resolve("mods");
     }
 
@@ -440,7 +473,7 @@ public final class NowsInstaller {
             }
             return properties;
         }
-        return downloadProperties(URI.create(location));
+        return downloadProperties(parseInternetUri(location));
     }
 
     private static Properties loadEmbeddedProperties(String resource) throws IOException {
@@ -511,6 +544,10 @@ public final class NowsInstaller {
         return options.artifactDir().resolve(relativePath).normalize();
     }
 
+    private static void downloadInternet(String location, Path destination) throws Exception {
+        download(parseInternetUri(location), destination);
+    }
+
     private static void download(URI uri, Path destination) throws Exception {
         Path temp = destination.resolveSibling(destination.getFileName() + ".part");
         Files.deleteIfExists(temp);
@@ -527,17 +564,104 @@ public final class NowsInstaller {
     }
 
     private static HttpURLConnection openConnection(URI uri) throws IOException {
+        return openConnection(uri, 0);
+    }
+
+    private static HttpURLConnection openConnection(URI uri, int redirects) throws IOException {
+        validateInternetUri(uri);
         HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
-        connection.setInstanceFollowRedirects(true);
+        connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(30_000);
         connection.setReadTimeout(30_000);
         connection.setRequestMethod("GET");
+        connection.setRequestProperty("User-Agent", USER_AGENT);
+        connection.setRequestProperty("Accept", "application/octet-stream, text/plain, */*");
         int status = connection.getResponseCode();
-        if (status / 100 != 2) {
+        if (isRedirect(status)) {
+            String location = connection.getHeaderField("Location");
             connection.disconnect();
-            throw new IOException("HTTP " + status + " for " + uri);
+            if (redirects >= MAX_REDIRECTS) {
+                throw new IOException("Too many redirects while downloading " + uri);
+            }
+            if (isBlank(location)) {
+                throw new IOException("HTTP " + status + " redirect without Location for " + uri);
+            }
+            URI next = uri.resolve(location);
+            validateRedirect(uri, next);
+            return openConnection(next, redirects + 1);
+        }
+        if (status / 100 != 2) {
+            String details = readErrorDetails(connection);
+            connection.disconnect();
+            throw new IOException("HTTP " + status + " for " + uri + details);
         }
         return connection;
+    }
+
+    private static URI parseInternetUri(String location) {
+        try {
+            URI uri = new URI(location);
+            validateInternetUri(uri);
+            return uri;
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid download URL: " + location, e);
+        }
+    }
+
+    private static void validateInternetUri(URI uri) {
+        String scheme = uri.getScheme();
+        if (scheme == null) {
+            throw new IllegalArgumentException("Download URL must include https://: " + uri);
+        }
+        if ("https".equalsIgnoreCase(scheme)) {
+            return;
+        }
+        if ("http".equalsIgnoreCase(scheme) && isLocalHttpHost(uri.getHost())) {
+            return;
+        }
+        throw new IllegalArgumentException("Refusing non-HTTPS download URL: " + uri);
+    }
+
+    private static boolean isLocalHttpHost(String host) {
+        if (host == null) {
+            return false;
+        }
+        String normalized = host.toLowerCase(Locale.ROOT);
+        return normalized.equals("localhost") || normalized.equals("127.0.0.1") || normalized.equals("::1");
+    }
+
+    private static void validateRedirect(URI from, URI to) {
+        validateInternetUri(to);
+        if ("https".equalsIgnoreCase(from.getScheme()) && !"https".equalsIgnoreCase(to.getScheme())) {
+            throw new IllegalArgumentException("Refusing HTTPS downgrade redirect from " + from + " to " + to);
+        }
+    }
+
+    private static boolean isRedirect(int status) {
+        return status == HttpURLConnection.HTTP_MOVED_PERM
+                || status == HttpURLConnection.HTTP_MOVED_TEMP
+                || status == HttpURLConnection.HTTP_SEE_OTHER
+                || status == 307
+                || status == 308;
+    }
+
+    private static String readErrorDetails(HttpURLConnection connection) {
+        InputStream error = connection.getErrorStream();
+        if (error == null) {
+            return "";
+        }
+        try (InputStream input = error) {
+            String body = new String(readAllBytes(input), StandardCharsets.UTF_8).trim();
+            if (body.isEmpty()) {
+                return "";
+            }
+            if (body.length() > 240) {
+                body = body.substring(0, 240) + "...";
+            }
+            return ": " + body.replace('\n', ' ').replace('\r', ' ');
+        } catch (IOException ignored) {
+            return "";
+        }
     }
 
     private static void copyEmbedded(String resource, Path destination) throws IOException {
@@ -578,20 +702,57 @@ public final class NowsInstaller {
     }
 
     static Path defaultMinecraftDir() {
+        List<Path> candidates = minecraftDirectoryCandidates();
+        for (Path candidate : candidates) {
+            if (looksLikeMinecraftDir(candidate)) {
+                return candidate;
+            }
+        }
+        return candidates.get(0);
+    }
+
+    static List<Path> minecraftDirectoryCandidates() {
+        List<Path> candidates = new ArrayList<>();
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        String home = System.getProperty("user.home");
         if (os.contains("win")) {
             String appData = System.getenv("APPDATA");
             if (!isBlank(appData)) {
-                return Paths.get(appData, ".minecraft").toAbsolutePath().normalize();
+                candidates.add(Paths.get(appData, ".minecraft").toAbsolutePath().normalize());
             }
-            return Paths.get(System.getProperty("user.home"), "AppData", "Roaming", ".minecraft")
-                    .toAbsolutePath().normalize();
+            candidates.add(Paths.get(home, "AppData", "Roaming", ".minecraft").toAbsolutePath().normalize());
+            candidates.add(Paths.get(home, ".minecraft").toAbsolutePath().normalize());
+            return uniquePaths(candidates);
         }
         if (os.contains("mac")) {
-            return Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft")
-                    .toAbsolutePath().normalize();
+            candidates.add(Paths.get(home, "Library", "Application Support", "minecraft").toAbsolutePath().normalize());
+            candidates.add(Paths.get(home, ".minecraft").toAbsolutePath().normalize());
+            return uniquePaths(candidates);
         }
-        return Paths.get(System.getProperty("user.home"), ".minecraft").toAbsolutePath().normalize();
+        String xdgDataHome = System.getenv("XDG_DATA_HOME");
+        if (!isBlank(xdgDataHome)) {
+            candidates.add(Paths.get(xdgDataHome, "minecraft").toAbsolutePath().normalize());
+        }
+        candidates.add(Paths.get(home, ".minecraft").toAbsolutePath().normalize());
+        candidates.add(Paths.get(home, ".var", "app", "com.mojang.Minecraft", ".minecraft").toAbsolutePath().normalize());
+        return uniquePaths(candidates);
+    }
+
+    static boolean looksLikeMinecraftDir(Path path) {
+        return Files.isRegularFile(path.resolve("launcher_profiles.json"))
+                || Files.isDirectory(path.resolve("versions"))
+                || Files.isDirectory(path.resolve("assets"))
+                || Files.isDirectory(path.resolve("libraries"));
+    }
+
+    private static List<Path> uniquePaths(List<Path> paths) {
+        List<Path> unique = new ArrayList<>();
+        for (Path path : paths) {
+            if (!unique.contains(path)) {
+                unique.add(path);
+            }
+        }
+        return unique;
     }
 
     private static String defaultProperty(String key, String fallback) {
@@ -960,6 +1121,7 @@ public final class NowsInstaller {
         final String embeddedManifestResource;
         final boolean embeddedArtifacts;
         final boolean profileGameDir;
+        final Path gameDir;
 
         private Options(
                 String nowsVersion,
@@ -970,7 +1132,8 @@ public final class NowsInstaller {
                 Path artifactDir,
                 String embeddedManifestResource,
                 boolean embeddedArtifacts,
-                boolean profileGameDir
+                boolean profileGameDir,
+                Path gameDir
         ) {
             this.nowsVersion = nowsVersion;
             this.minecraftVersion = minecraftVersion;
@@ -981,6 +1144,7 @@ public final class NowsInstaller {
             this.embeddedManifestResource = embeddedManifestResource;
             this.embeddedArtifacts = embeddedArtifacts;
             this.profileGameDir = profileGameDir;
+            this.gameDir = gameDir;
         }
 
         static Options parse(String[] args) {
@@ -991,6 +1155,7 @@ public final class NowsInstaller {
             boolean profileGameDir = false;
             Path artifactDir = null;
             Path minecraftDir = defaultMinecraftDir();
+            Path gameDir = null;
 
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
@@ -1007,6 +1172,10 @@ public final class NowsInstaller {
                     offline = true;
                 } else if ("--profileGameDir".equals(arg)) {
                     profileGameDir = true;
+                } else if ("--gameDir".equals(arg)) {
+                    gameDir = Paths.get(requireValue(args, ++i, "--gameDir"))
+                            .toAbsolutePath().normalize();
+                    profileGameDir = true;
                 } else if ("--artifactDir".equals(arg)) {
                     artifactDir = Paths.get(requireValue(args, ++i, "--artifactDir"))
                             .toAbsolutePath().normalize();
@@ -1017,7 +1186,7 @@ public final class NowsInstaller {
             if (offline && manifest == null) {
                 throw new IllegalArgumentException("Offline install requires --manifest pointing to a local file");
             }
-            return new Options(nows, minecraft, minecraftDir, manifest, offline, artifactDir, null, false, profileGameDir);
+            return new Options(nows, minecraft, minecraftDir, manifest, offline, artifactDir, null, false, profileGameDir, gameDir);
         }
 
         Options withEmbeddedOfflinePayload() throws IOException {
@@ -1032,8 +1201,13 @@ public final class NowsInstaller {
                     artifactDir,
                     resource,
                     true,
-                    profileGameDir
+                    profileGameDir,
+                    gameDir
             );
+        }
+
+        boolean usesProfileGameDir() {
+            return profileGameDir || gameDir != null;
         }
 
         String manifestLocation() {
