@@ -13,10 +13,11 @@ val kotlinVersion = providers.gradleProperty("kotlin_version")
 val jetbrainsAnnotationsVersion = providers.gradleProperty("jetbrains_annotations_version")
 val minecraftVersion = providers.gradleProperty("minecraft_version")
 val nowsReleaseBaseUrl = providers.gradleProperty("nows_release_base_url")
+val kdl4jCoordinate = "com.github.kdl-org:kdl4j:v${kdl4jVersion.get()}"
 
-// GitHub Packages are resolved while building NowsInstaller, then embedded in the
-// installer itself. End users therefore do not need GitHub credentials.
-val embeddedGitHubPackages by configurations.creating {
+// KDL4J is resolved while building NowsInstaller, then embedded in the installer
+// itself. JitPack is preferred; end users therefore do not need GitHub credentials.
+val embeddedKdlLibraries by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
     isTransitive = false
@@ -29,7 +30,7 @@ val offlineMavenArtifacts by configurations.creating {
 }
 
 dependencies {
-    embeddedGitHubPackages("dev.kdl:kdl4j:${kdl4jVersion.get()}")
+    embeddedKdlLibraries(kdl4jCoordinate)
 
     offlineMavenArtifacts("foo.zaaarf.geb:core:${gebCoreVersion.get()}")
     offlineMavenArtifacts("io.projectreactor:reactor-core:${reactorVersion.get()}")
@@ -58,8 +59,8 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 val embeddedDir = layout.buildDirectory.dir("generated/embedded-libs")
-val prepareEmbeddedLibraries by tasks.registering(Copy::class) {
-    from(embeddedGitHubPackages)
+val prepareEmbeddedLibraries by tasks.registering(Sync::class) {
+    from(embeddedKdlLibraries)
     into(embeddedDir)
 }
 

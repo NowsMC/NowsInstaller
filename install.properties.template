@@ -29,11 +29,11 @@ artifact.6.coordinate=space.nows.mcnows:nows-runtime:${nows.version}
 artifact.6.path=space/nows/mcnows/nows-runtime/${nows.version}/nows-runtime-${nows.version}.jar
 artifact.6.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-runtime/${nows.version}/nows-runtime-${nows.version}.jar
 
-# GitHub Package: bundled inside NowsInstaller and copied out; user needs no GitHub token.
-artifact.7.coordinate=dev.kdl:kdl4j:1.0.1
-artifact.7.path=dev/kdl/kdl4j/1.0.1/kdl4j-1.0.1.jar
+# KDL4J: resolved from JitPack first, bundled inside NowsInstaller, and copied out.
+artifact.7.coordinate=com.github.kdl-org:kdl4j:v1.0.1
+artifact.7.path=com/github/kdl-org/kdl4j/v1.0.1/kdl4j-v1.0.1.jar
 artifact.7.source=embedded
-artifact.7.resource=/META-INF/nows/embedded-libs/kdl4j-1.0.1.jar
+artifact.7.resource=/META-INF/nows/embedded-libs/kdl4j-v1.0.1.jar
 
 # Public runtime libraries. Minecraft-owned Log4j/SLF4J/Gson/Guava/JSpecify are not duplicated.
 # Offline testing can reuse these paths by placing JARs under --artifactDir with the same relative layout.

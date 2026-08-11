@@ -72,17 +72,17 @@ Run the fully offline installer with:
 java -jar build/libs/NowsInstaller-offline-<version>.jar
 ```
 
-## GitHub Packages
+## Embedded KDL4J
 
-GitHub Package dependencies are resolved when building the installer and embedded as untouched JAR resources. Currently:
+KDL4J is resolved from JitPack first when building the installer and embedded as an untouched JAR resource. GitHub Packages remains available to release environments as a fallback for legacy coordinates. Currently:
 
 ```text
-dev.kdl:kdl4j:1.0.1
- -> META-INF/nows/embedded-libs/kdl4j-1.0.1.jar
- -> .minecraft/libraries/dev/kdl/kdl4j/1.0.1/kdl4j-1.0.1.jar
+com.github.kdl-org:kdl4j:v1.0.1
+ -> META-INF/nows/embedded-libs/kdl4j-v1.0.1.jar
+ -> .minecraft/libraries/com/github/kdl-org/kdl4j/v1.0.1/kdl4j-v1.0.1.jar
 ```
 
-End users therefore need no GitHub credentials. The release build does.
+End users therefore need no GitHub credentials.
 
 ## Internet manifest
 
