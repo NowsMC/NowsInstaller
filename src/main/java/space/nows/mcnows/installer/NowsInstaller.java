@@ -26,6 +26,7 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.jar.JarFile;
 
 /**
  * Internet-first Nows installer.
@@ -311,18 +312,22 @@ public final class NowsInstaller {
             Options options,
             Properties manifest,
             List<InstalledLibrary> libraries
-    ) throws IOException {
+    ) throws Exception {
         String profile = profileId(options);
         Instant now = Instant.now();
         Path versionDir = options.minecraftDir.resolve("versions").resolve(profile);
         Files.createDirectories(versionDir);
-        boolean copiedInheritedJar = copyInheritedVersionJar(options, versionDir.resolve(profile + ".jar"));
+        Path profileJar = versionDir.resolve(profile + ".jar");
+        boolean hasProfileJar = installClientJar(options, manifest, profileJar);
+        if (!hasProfileJar) {
+            hasProfileJar = copyInheritedVersionJar(options, profileJar);
+        }
         StringBuilder json = new StringBuilder();
 
         json.append("{\n");
         json.append("  \"id\": ").append(quote(profile)).append(",\n");
         json.append("  \"inheritsFrom\": ").append(quote(options.minecraftVersion)).append(",\n");
-        if (!copiedInheritedJar) {
+        if (!hasProfileJar) {
             json.append("  \"jar\": ").append(quote(options.minecraftVersion)).append(",\n");
         }
         json.append("  \"mainClass\": ")
@@ -362,6 +367,68 @@ public final class NowsInstaller {
         return profile;
     }
 
+    private static boolean installClientJar(Options options, Properties manifest, Path destination) throws Exception {
+        String relativePath = manifest.getProperty("clientJar.path", "").trim().replace('\\', '/');
+        if (isBlank(relativePath)) {
+            return false;
+        }
+        String source = manifest.getProperty("clientJar.source", "internet").trim();
+        String expectedSha256 = manifest.getProperty("clientJar.sha256", "").trim();
+        String sourceUrl = manifest.getProperty("clientJar.url", "").trim();
+
+        Files.createDirectories(destination.getParent());
+        if (Files.isRegularFile(destination)
+                && !expectedSha256.isEmpty()
+                && sha256(destination).equalsIgnoreCase(expectedSha256)
+                && containsNamedMinecraft(destination)) {
+            return true;
+        }
+
+        if (source.equals("embedded")) {
+            copyEmbedded(required(manifest, "clientJar.resource"), destination);
+        } else if (options.embeddedArtifacts) {
+            copyEmbedded("/META-INF/nows/offline-client/" + relativePath, destination);
+        } else if (options.offline) {
+            copyLocalClientJar(options, manifest, relativePath, destination);
+        } else if (source.equals("internet")) {
+            if (isBlank(sourceUrl)) {
+                throw new IllegalArgumentException("Missing URL for client jar: " + relativePath);
+            }
+            downloadInternet(sourceUrl, destination);
+        } else if (source.equals("local")) {
+            copyLocalClientJar(options, manifest, relativePath, destination);
+        } else {
+            throw new IllegalArgumentException("Unknown client jar source '" + source + "' for " + relativePath);
+        }
+
+        if (!expectedSha256.isEmpty()) {
+            String actual = sha256(destination);
+            if (!actual.equalsIgnoreCase(expectedSha256)) {
+                Files.deleteIfExists(destination);
+                throw new IOException("SHA-256 mismatch for client jar " + relativePath + ": expected "
+                        + expectedSha256 + ", got " + actual);
+            }
+        }
+        if (!containsNamedMinecraft(destination)) {
+            Files.deleteIfExists(destination);
+            throw new IOException("Client jar is not Mojang-named: " + relativePath);
+        }
+        return true;
+    }
+
+    private static void copyLocalClientJar(
+            Options options,
+            Properties manifest,
+            String relativePath,
+            Path destination
+    ) throws IOException {
+        Path source = localArtifactPath(options, manifest.getProperty("clientJar.file", "").trim(), relativePath);
+        if (!Files.isRegularFile(source)) {
+            throw new IOException("Offline client jar missing: " + source);
+        }
+        Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
+    }
+
     private static boolean copyInheritedVersionJar(Options options, Path target) throws IOException {
         Path source = options.minecraftDir
                 .resolve("versions")
@@ -372,6 +439,13 @@ public final class NowsInstaller {
         }
         Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
         return true;
+    }
+
+    private static boolean containsNamedMinecraft(Path jar) throws IOException {
+        try (JarFile file = new JarFile(jar.toFile())) {
+            return file.getEntry("net/minecraft/client/Minecraft.class") != null
+                    && file.getEntry("net/minecraft/client/main/Main.class") != null;
+        }
     }
 
     @SuppressWarnings("unchecked")

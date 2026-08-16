@@ -4,6 +4,10 @@ minecraft.version=26.2
 mainClass=space.nows.mcnows.runtime.NowsLauncher
 mavenBaseUrl=https://repo1.maven.org/maven2
 
+# Optional prepared Mojang-named Minecraft client jar.
+# Release automation fills clientJar.path/url/sha256 when a staged client-dev.jar is available.
+# If omitted, the installer falls back to the inherited vanilla version jar.
+
 # Nows modular jars are downloaded from files.nows.space. Keep these independently replaceable.
 # If files.nows.space is unavailable, NowsInstaller falls back to mavenBaseUrl + artifact path.
 artifact.count=26
