@@ -1,6 +1,6 @@
 # NowsInstaller
 
-Internet-first Official Launcher installer for Nows, with a local offline mode for development testing.
+Internet-first Official Launcher installer for Nows, with advanced local offline options for development testing.
 
 The installer itself contains no loader architecture. It reads `install.properties` from `files.nows.space`, installs each declared artifact under `.minecraft/libraries`, writes an inherited Launcher version whose `mainClass` is `space.nows.mcnows.runtime.NowsLauncher`, then merges a Nows installation entry into `launcher_profiles.json`.
 
@@ -30,9 +30,9 @@ Before changing an existing `launcher_profiles.json`, it creates a sibling backu
 
 By default, the launcher profile does not set `gameDir`, so the game runs on the launcher's normal Minecraft game folder. Nows mods are discovered from that game folder's `mods` directory first, matching other loaders, and from `.minecraft/nows/profiles/nows-<nows-version>-<minecraft-version>/mods` as an optional Nows-only overlay.
 
-Use `--profileGameDir` in the CLI installer to make the launcher profile use `.minecraft/nows/profiles/nows-<nows-version>-<minecraft-version>/` as its game folder. Use `--gameDir <path>` to choose a custom folder.
+Use `--profileGameDir` from the command line, or the UI's advanced options button, to make the launcher profile use `.minecraft/nows/profiles/nows-<nows-version>-<minecraft-version>/` as its game folder. Use `--gameDir <path>` to choose a custom folder.
 
-The UI installer is the normal user-facing entrypoint. It auto-detects the Minecraft folder for Windows, macOS and Linux, allows browsing manually, and can set a custom game folder for the Nows profile.
+The installer UI is the normal user-facing entrypoint. It lets players choose a supported Minecraft version, auto-detects the main Minecraft folder for Windows, macOS and Linux, and keeps profile/offline settings behind a small advanced options button.
 
 The profile icon is embedded from:
 
@@ -46,30 +46,16 @@ src/main/resources/META-INF/nows/branding/nows.png
 ./gradlew :repos:NowsInstaller:assemble
 ```
 
-This builds separate installer JARs:
+This builds one user-facing installer JAR:
 
 ```text
-build/libs/NowsInstaller-cli-<version>.jar
-build/libs/NowsInstaller-ui-<version>.jar
-build/libs/NowsInstaller-offline-<version>.jar
+build/libs/NowsInstaller-<version>.jar
 ```
 
-Run the UI installer with:
+Run the installer with:
 
 ```bash
-java -jar build/libs/NowsInstaller-ui-<version>.jar
-```
-
-Run the CLI installer with:
-
-```bash
-java -jar build/libs/NowsInstaller-cli-<version>.jar
-```
-
-Run the fully offline installer with:
-
-```bash
-java -jar build/libs/NowsInstaller-offline-<version>.jar
+java -jar build/libs/NowsInstaller-<version>.jar
 ```
 
 ## Embedded KDL4J
@@ -96,28 +82,20 @@ Use `install.properties.template` as the release template. Release automation sh
 
 The manifest may also include `mod.<n>` companion mod entries. These are copied to the active game folder's `mods` directory. The 0.4.0 default manifest does not use this for `NowsApiMod`; the title-screen badge is provided by the required `mc/<minecraft-version>` adapter instead.
 
-## Fully offline installer
-
-`NowsInstaller-offline-<version>.jar` embeds the release manifest and every non-Minecraft artifact listed by the installer manifest. Its Nows module payloads are taken from this workspace's Gradle project JAR tasks (`:core:jar`, `:runtime:jar`, integrations, and Minecraft support), so a local build installs the local project output. At install time it copies those embedded payloads into `.minecraft/libraries` and writes the same launcher profile as the normal installer without contacting `files.nows.space` or Maven.
-
-The CLI/UI installers are generic entrypoints. `./gradlew publishLayout` stages UI/CLI release folders for every supported `mc/<minecraft-version>` adapter. The fully offline installer is Minecraft-version-specific because it embeds one processed manifest and one `nows-mc-<minecraft-version>` adapter, so the normal publish layout copies it only for the active `minecraft_version` with the Minecraft version in the filename:
+## Published installer
 
 ```text
-.publishing/releases/nows/<nows-version>/<minecraft-version>/installers/NowsInstaller-offline-<nows-version>-mc-<minecraft-version>.jar
+.publishing/releases/nows/<nows-version>/installers/NowsInstaller-<nows-version>.jar
 ```
 
-Build another offline installer by selecting a different supported version:
-
-```bash
-./gradlew -Pminecraft_version=1.20.1 publishLayout
-```
+The same installer selects the target Minecraft version at runtime and downloads the matching release manifest from `files.nows.space`.
 
 ## Offline local testing
 
 Use `--offline` to install from files already on disk. In offline mode the installer never downloads the manifest or artifacts:
 
 ```bash
-java -jar build/libs/NowsInstaller-cli-<version>.jar \
+java -cp build/libs/NowsInstaller-<version>.jar space.nows.mcnows.installer.NowsInstaller \
   --offline \
   --manifest /path/to/install.properties \
   --artifactDir /path/to/offline-libraries \

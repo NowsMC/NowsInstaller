@@ -701,6 +701,25 @@ public final class NowsInstaller {
         return defaultProperty("minecraft.version", "26.2");
     }
 
+    static List<String> supportedMinecraftVersions() {
+        String configured = defaultProperty("minecraft.versions", "");
+        List<String> versions = new ArrayList<>();
+        if (!isBlank(configured)) {
+            String[] parts = configured.split(",");
+            for (String part : parts) {
+                String version = part.trim();
+                if (!version.isEmpty() && !versions.contains(version)) {
+                    versions.add(version);
+                }
+            }
+        }
+        String fallback = defaultMinecraftVersion();
+        if (!versions.contains(fallback)) {
+            versions.add(0, fallback);
+        }
+        return versions;
+    }
+
     static Path defaultMinecraftDir() {
         List<Path> candidates = minecraftDirectoryCandidates();
         for (Path candidate : candidates) {

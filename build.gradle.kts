@@ -1,6 +1,6 @@
 import java.util.Properties
 
-plugins { application }
+plugins { java }
 
 val kdl4jVersion = providers.gradleProperty("kdl4j_version")
 val gebCoreVersion = providers.gradleProperty("geb_core_version")
@@ -14,6 +14,25 @@ val jetbrainsAnnotationsVersion = providers.gradleProperty("jetbrains_annotation
 val minecraftVersion = providers.gradleProperty("minecraft_version")
 val nowsReleaseBaseUrl = providers.gradleProperty("nows_release_base_url")
 val kdl4jCoordinate = "com.github.kdl-org:kdl4j:v${kdl4jVersion.get()}"
+val installerMainClass = "space.nows.mcnows.installer.NowsInstallerGui"
+
+fun compareVersionStrings(left: String, right: String): Int {
+    val leftParts = left.split(".").map { it.toIntOrNull() ?: 0 }
+    val rightParts = right.split(".").map { it.toIntOrNull() ?: 0 }
+    val length = maxOf(leftParts.size, rightParts.size)
+    for (index in 0 until length) {
+        val diff = (leftParts.getOrNull(index) ?: 0) - (rightParts.getOrNull(index) ?: 0)
+        if (diff != 0) return diff
+    }
+    return 0
+}
+
+val supportedMinecraftVersions = rootProject.layout.projectDirectory.dir("mc").asFile
+    .listFiles { file -> file.isDirectory && file.resolve("build.gradle.kts").isFile }
+    .orEmpty()
+    .map { it.name }
+    .sortedWith(::compareVersionStrings)
+    .asReversed()
 
 // KDL4J is resolved while building NowsInstaller, then embedded in the installer
 // itself. JitPack is preferred; end users therefore do not need GitHub credentials.
@@ -68,6 +87,7 @@ val installerDefaultsDir = layout.buildDirectory.dir("generated/installer-defaul
 val prepareInstallerDefaults by tasks.registering {
     inputs.property("nowsVersion", project.version.toString())
     inputs.property("minecraftVersion", minecraftVersion)
+    inputs.property("minecraftVersions", supportedMinecraftVersions.joinToString(","))
     outputs.dir(installerDefaultsDir)
 
     doLast {
@@ -77,6 +97,7 @@ val prepareInstallerDefaults by tasks.registering {
             """
             nows.version=${project.version}
             minecraft.version=${minecraftVersion.get()}
+            minecraft.versions=${supportedMinecraftVersions.joinToString(",")}
             """.trimIndent() + "\n"
         )
     }
@@ -227,33 +248,12 @@ tasks.processResources {
     from(installerDefaultsDir) { into("META-INF/nows/installer") }
 }
 
-application { mainClass.set("space.nows.mcnows.installer.NowsInstaller") }
-
 tasks.jar {
     dependsOn(prepareEmbeddedLibraries)
-    archiveBaseName.set("NowsInstaller-cli")
-    manifest { attributes("Main-Class" to application.mainClass.get()) }
+    archiveBaseName.set("NowsInstaller")
+    manifest { attributes("Main-Class" to installerMainClass) }
 }
 
-val guiJar by tasks.registering(Jar::class) {
-    group = "build"
-    description = "Builds the Swing GUI Nows installer JAR."
-    dependsOn(tasks.classes)
-    archiveBaseName.set("NowsInstaller-ui")
-    from(sourceSets.main.get().output)
-    manifest { attributes("Main-Class" to "space.nows.mcnows.installer.NowsInstallerGui") }
-}
-
-val offlineJar by tasks.registering(Jar::class) {
-    group = "build"
-    description = "Builds the fully offline Nows installer JAR with all manifest artifacts embedded."
-    dependsOn(tasks.classes, prepareOfflinePayload)
-    archiveBaseName.set("NowsInstaller-offline")
-    from(sourceSets.main.get().output)
-    from(offlinePayloadDir)
-    manifest { attributes("Main-Class" to "space.nows.mcnows.installer.NowsInstallerOffline") }
-}
-
-tasks.assemble {
-    dependsOn(guiJar, offlineJar)
+tasks.named("sourcesJar") {
+    enabled = false
 }

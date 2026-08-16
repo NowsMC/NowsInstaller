@@ -21,6 +21,9 @@ import javax.net.ssl.SSLException;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -37,22 +40,28 @@ import javax.swing.event.DocumentListener;
 
 public final class NowsInstallerGui {
     private final JFrame frame = new JFrame("Nows Installer");
-    private final JTextField nowsVersion = new JTextField(NowsInstaller.defaultNowsVersion());
-    private final JTextField minecraftVersion = new JTextField(NowsInstaller.defaultMinecraftVersion());
+    private final JLabel nowsVersion = new JLabel(NowsInstaller.defaultNowsVersion());
+    private final JComboBox<String> minecraftVersion = new JComboBox<>(
+            NowsInstaller.supportedMinecraftVersions().toArray(new String[0]));
     private final JTextField minecraftDir = new JTextField(defaultMinecraftDir());
     private final JTextField gameDir = new JTextField(defaultGameDir());
     private final JTextField manifest = new JTextField();
     private final JTextField artifactDir = new JTextField();
     private final JCheckBox offline = new JCheckBox("Offline install");
-    private final JCheckBox profileGameDir = new JCheckBox("Use a custom game folder for this Nows profile");
+    private final JCheckBox profileGameDir = new JCheckBox("Use a separate game folder for this Nows profile");
+    private final JButton gameDirBrowse = new JButton("Browse");
+    private final JButton manifestBrowse = new JButton("Browse");
+    private final JButton artifactDirBrowse = new JButton("Browse");
     private final JButton install = new JButton("Install");
+    private final JButton advanced = squareButton("...");
     private final JLabel minecraftDirStatus = new JLabel(" ");
+    private final JLabel installHint = new JLabel(" ");
     private final JLabel offlineHint = new JLabel(" ");
     private final JTextArea log = new JTextArea();
 
     private NowsInstallerGui() {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setMinimumSize(new Dimension(760, 560));
+        frame.setMinimumSize(new Dimension(720, 460));
         frame.setLayout(new BorderLayout(12, 12));
         setWindowIcon();
         frame.add(form(), BorderLayout.NORTH);
@@ -62,18 +71,22 @@ public final class NowsInstallerGui {
 
         offline.addActionListener(event -> updateOfflineFields());
         profileGameDir.addActionListener(event -> updateGameDirFields());
+        gameDirBrowse.addActionListener(event -> choose(gameDir, JFileChooser.DIRECTORIES_ONLY));
+        manifestBrowse.addActionListener(event -> choose(manifest, JFileChooser.FILES_ONLY));
+        artifactDirBrowse.addActionListener(event -> choose(artifactDir, JFileChooser.DIRECTORIES_ONLY));
+        minecraftVersion.addActionListener(event -> updateDefaultGameDir());
         minecraftDir.getDocument().addDocumentListener(new SimpleDocumentListener() {
             @Override
             public void update() {
                 updateMinecraftDirStatus();
-                if (!profileGameDir.isSelected()) {
-                    gameDir.setText(defaultGameDir());
-                }
+                updateDefaultGameDir();
+                updateInstallHint();
             }
         });
         updateOfflineFields();
         updateGameDirFields();
         updateMinecraftDirStatus();
+        updateInstallHint();
         frame.pack();
         frame.setLocationRelativeTo(null);
     }
@@ -110,22 +123,10 @@ public final class NowsInstallerGui {
         minecraftDirStatus.setVerticalAlignment(SwingConstants.TOP);
         panel.add(minecraftDirStatus, statusGbc);
 
-        addRow(panel, 4, "Game folder", gameDir, browseDirectoryButton(gameDir));
-        addRow(panel, 5, "Manifest file", manifest, browseFileButton(manifest));
-        addRow(panel, 6, "Artifact folder", artifactDir, browseDirectoryButton(artifactDir));
-
-        GridBagConstraints offlineGbc = constraints(7, 1);
-        offlineGbc.gridwidth = 2;
-        panel.add(offline, offlineGbc);
-
-        GridBagConstraints profileGbc = constraints(8, 1);
-        profileGbc.gridwidth = 2;
-        panel.add(profileGameDir, profileGbc);
-
-        GridBagConstraints hintGbc = constraints(9, 1);
+        GridBagConstraints hintGbc = constraints(4, 1);
         hintGbc.gridwidth = 2;
         hintGbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(offlineHint, hintGbc);
+        panel.add(installHint, hintGbc);
         return panel;
     }
 
@@ -134,7 +135,7 @@ public final class NowsInstallerGui {
         log.setLineWrap(true);
         log.setWrapStyleWord(true);
         JScrollPane pane = new JScrollPane(log);
-        pane.setPreferredSize(new Dimension(720, 260));
+        pane.setPreferredSize(new Dimension(680, 230));
         pane.setBorder(BorderFactory.createEmptyBorder(12, 14, 0, 14));
         return pane;
     }
@@ -202,7 +203,7 @@ public final class NowsInstallerGui {
     private String[] installerArgs() {
         List<String> args = new ArrayList<>();
         addOption(args, "--nows", nowsVersion.getText());
-        addOption(args, "--minecraft", minecraftVersion.getText());
+        addOption(args, "--minecraft", selectedMinecraftVersion());
         addOption(args, "--minecraftDir", minecraftDir.getText());
         if (offline.isSelected()) {
             args.add("--offline");
@@ -228,7 +229,7 @@ public final class NowsInstallerGui {
         log.setCaretPosition(log.getDocument().getLength());
     }
 
-    private static void addRow(JPanel panel, int row, String label, JTextField field, JPanel buttons) {
+    private static void addRow(JPanel panel, int row, String label, JComponent field, JPanel buttons) {
         GridBagConstraints labelConstraints = constraints(row, 0);
         labelConstraints.weightx = 0;
         panel.add(new JLabel(label), labelConstraints);
@@ -262,9 +263,12 @@ public final class NowsInstallerGui {
         browse.addActionListener(event -> choose(minecraftDir, JFileChooser.DIRECTORIES_ONLY));
         detect.addActionListener(event -> detectMinecraftDir());
         defaults.addActionListener(event -> minecraftDir.setText(NowsInstaller.defaultMinecraftDir().toString()));
+        advanced.setToolTipText("Advanced profile and offline options");
+        advanced.addActionListener(event -> showAdvancedOptions());
         buttons.add(browse);
         buttons.add(detect);
         buttons.add(defaults);
+        buttons.add(advanced);
         return buttons;
     }
 
@@ -278,16 +282,51 @@ public final class NowsInstallerGui {
         return new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
     }
 
-    private JPanel browseDirectoryButton(final JTextField target) {
-        JButton button = new JButton("Browse");
-        button.addActionListener(event -> choose(target, JFileChooser.DIRECTORIES_ONLY));
-        return buttonPanel(button);
+    private static JButton squareButton(String text) {
+        JButton button = new JButton(text);
+        Dimension size = new Dimension(28, 28);
+        button.setMinimumSize(size);
+        button.setPreferredSize(size);
+        button.setMargin(new Insets(0, 0, 0, 0));
+        return button;
     }
 
-    private JPanel browseFileButton(final JTextField target) {
-        JButton button = new JButton("Browse");
-        button.addActionListener(event -> choose(target, JFileChooser.FILES_ONLY));
-        return buttonPanel(button);
+    private void showAdvancedOptions() {
+        final JDialog dialog = new JDialog(frame, "Advanced options", true);
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+
+        JPanel fields = new JPanel(new GridBagLayout());
+        GridBagConstraints profileGbc = constraints(0, 0);
+        profileGbc.gridwidth = 3;
+        fields.add(profileGameDir, profileGbc);
+        addRow(fields, 1, "Profile game folder", gameDir, buttonPanel(gameDirBrowse));
+
+        GridBagConstraints offlineGbc = constraints(2, 0);
+        offlineGbc.gridwidth = 3;
+        fields.add(offline, offlineGbc);
+        addRow(fields, 3, "Manifest file", manifest, buttonPanel(manifestBrowse));
+        addRow(fields, 4, "Artifact folder", artifactDir, buttonPanel(artifactDirBrowse));
+
+        GridBagConstraints hintGbc = constraints(5, 1);
+        hintGbc.gridwidth = 2;
+        hintGbc.fill = GridBagConstraints.HORIZONTAL;
+        fields.add(offlineHint, hintGbc);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        JButton done = new JButton("Done");
+        done.addActionListener(event -> dialog.dispose());
+        actions.add(done);
+
+        panel.add(fields, BorderLayout.CENTER);
+        panel.add(actions, BorderLayout.SOUTH);
+        dialog.setContentPane(panel);
+        updateOfflineFields();
+        updateGameDirFields();
+        dialog.pack();
+        dialog.setMinimumSize(new Dimension(620, dialog.getHeight()));
+        dialog.setLocationRelativeTo(frame);
+        dialog.setVisible(true);
     }
 
     private void choose(JTextField target, int mode) {
@@ -322,6 +361,8 @@ public final class NowsInstallerGui {
         boolean enabled = offline.isSelected();
         manifest.setEnabled(enabled);
         artifactDir.setEnabled(enabled);
+        manifestBrowse.setEnabled(enabled);
+        artifactDirBrowse.setEnabled(enabled);
         offlineHint.setText(enabled
                 ? "Offline install uses the selected local manifest and artifacts folder."
                 : "Online install downloads the release manifest and artifacts over HTTPS.");
@@ -330,7 +371,14 @@ public final class NowsInstallerGui {
     private void updateGameDirFields() {
         boolean enabled = profileGameDir.isSelected();
         gameDir.setEnabled(enabled);
+        gameDirBrowse.setEnabled(enabled);
         if (enabled && (gameDir.getText() == null || gameDir.getText().trim().isEmpty())) {
+            gameDir.setText(defaultGameDir());
+        }
+    }
+
+    private void updateDefaultGameDir() {
+        if (!profileGameDir.isSelected()) {
             gameDir.setText(defaultGameDir());
         }
     }
@@ -338,7 +386,7 @@ public final class NowsInstallerGui {
     private void updateMinecraftDirStatus() {
         Path path = selectedMinecraftDirQuietly();
         if (path == null) {
-            minecraftDirStatus.setText("Enter a Minecraft folder.");
+            minecraftDirStatus.setText("Choose the main Minecraft game folder.");
         } else if (NowsInstaller.looksLikeMinecraftDir(path)) {
             minecraftDirStatus.setText("Detected an existing Minecraft folder.");
         } else if (Files.exists(path)) {
@@ -346,6 +394,12 @@ public final class NowsInstallerGui {
         } else {
             minecraftDirStatus.setText("Folder will be created if you install here.");
         }
+    }
+
+    private void updateInstallHint() {
+        Path path = selectedMinecraftDirQuietly();
+        String folder = path == null ? "the selected Minecraft folder" : path.toString();
+        installHint.setText("Normal install uses " + folder + " as the game folder. Profile folder is optional.");
     }
 
     private Path selectedMinecraftDir() {
@@ -412,7 +466,7 @@ public final class NowsInstallerGui {
         }
         if (cause instanceof SSLException) {
             return "HTTPS connection failed. Check your network, system clock, Java certificate store, "
-                    + "or try the offline installer.\n\n" + message;
+                    + "or try an offline install from Advanced options.\n\n" + message;
         }
         return message;
     }
@@ -434,6 +488,11 @@ public final class NowsInstallerGui {
         return NowsInstaller.defaultMinecraftDir().toString();
     }
 
+    private String selectedMinecraftVersion() {
+        Object selected = minecraftVersion.getSelectedItem();
+        return selected == null ? NowsInstaller.defaultMinecraftVersion() : selected.toString();
+    }
+
     private String defaultGameDir() {
         Path base = selectedMinecraftDirQuietly();
         if (base == null) {
@@ -442,7 +501,7 @@ public final class NowsInstallerGui {
         return base
                 .resolve("nows")
                 .resolve("profiles")
-                .resolve("nows-" + nowsVersion.getText().trim() + "-" + minecraftVersion.getText().trim())
+                .resolve("nows-" + nowsVersion.getText().trim() + "-" + selectedMinecraftVersion())
                 .toString();
     }
 
