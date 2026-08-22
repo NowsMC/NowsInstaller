@@ -1,3 +1,4 @@
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins { java }
@@ -104,6 +105,24 @@ val prepareInstallerDefaults by tasks.registering {
 }
 
 val offlinePayloadDir = layout.buildDirectory.dir("generated/offline-installer")
+val offlineMinecraftVersion = minecraftVersion.get()
+val offlineClientJarFile = project(":mc:$offlineMinecraftVersion").tasks.named("nowsPrepareMinecraft").map { task ->
+    task.outputs.files.files.single { it.name == "client-dev.jar" }
+}
+
+fun sha256(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
 fun offlineModuleArtifactsFor(minecraft: String): Map<String, String> = mapOf(
     ":core" to "space/nows/mcnows/nows-core/${project.version}/nows-core-${project.version}.jar",
     ":minecraft" to "space/nows/mcnows/nows-minecraft/${project.version}/nows-minecraft-${project.version}.jar",
@@ -137,6 +156,7 @@ val offlineMavenArtifactPaths = mapOf(
 val offlineManifestFile = layout.buildDirectory.file("generated/offline-installer-manifest/install.properties")
 val prepareOfflineManifest by tasks.registering {
     inputs.file("install.properties.template")
+    inputs.file(offlineClientJarFile)
     inputs.property("nowsVersion", project.version.toString())
     inputs.property("minecraftVersion", minecraftVersion)
     inputs.property("nowsReleaseBaseUrl", nowsReleaseBaseUrl)
@@ -152,6 +172,9 @@ val prepareOfflineManifest by tasks.registering {
         manifest["nows.version"] = nows
         manifest["minecraft.version"] = minecraft
         manifest["releaseBaseUrl"] = releaseBaseUrl
+        manifest["clientJar.path"] = "client/client-dev.jar"
+        manifest["clientJar.url"] = "$releaseBaseUrl/client/client-dev.jar"
+        manifest["clientJar.sha256"] = sha256(offlineClientJarFile.get())
         offlineModuleArtifactsFor(minecraft).forEach { (projectPath, relativePath) ->
             val index = offlineModuleArtifactIndex(projectPath, minecraft) ?: return@forEach
             val artifactId = offlineModuleArtifactId(projectPath, minecraft)
@@ -184,7 +207,6 @@ val prepareOfflineManifest by tasks.registering {
     }
 }
 
-val offlineMinecraftVersion = minecraftVersion.get()
 val offlineModuleArtifacts = offlineModuleArtifactsFor(offlineMinecraftVersion)
 fun offlineModuleArtifactIndex(projectPath: String, minecraft: String): Int? = when (projectPath) {
     ":core" -> 0
@@ -214,6 +236,7 @@ fun offlineModuleArtifactId(projectPath: String, minecraft: String): String = wh
 
 val prepareOfflinePayload by tasks.registering(Copy::class) {
     dependsOn(prepareOfflineManifest)
+    dependsOn(":mc:$offlineMinecraftVersion:nowsPrepareMinecraft")
     dependsOn(offlineModuleArtifacts.keys.map { project(it).tasks.named("jar") })
     doFirst {
         delete(offlinePayloadDir)
@@ -239,6 +262,10 @@ val prepareOfflinePayload by tasks.registering(Copy::class) {
         }
         includeEmptyDirs = false
     }
+    from(offlineClientJarFile) {
+        into("META-INF/nows/offline-client/client")
+        rename { "client-dev.jar" }
+    }
     into(offlinePayloadDir)
 }
 
@@ -252,6 +279,22 @@ tasks.jar {
     dependsOn(prepareEmbeddedLibraries)
     archiveBaseName.set("NowsInstaller")
     manifest { attributes("Main-Class" to installerMainClass) }
+}
+
+val offlineJar by tasks.registering(Jar::class) {
+    dependsOn(tasks.classes, prepareOfflinePayload)
+    group = "build"
+    description = "Builds an offline Nows installer with the manifest, libraries, and client jar embedded."
+    archiveBaseName.set("NowsInstallerOffline")
+    archiveClassifier.set("mc-$offlineMinecraftVersion")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(sourceSets.main.get().output)
+    from(offlinePayloadDir)
+    manifest { attributes("Main-Class" to "space.nows.mcnows.installer.NowsInstallerOffline") }
+}
+
+tasks.assemble {
+    dependsOn(offlineJar)
 }
 
 tasks.named("sourcesJar") {

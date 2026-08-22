@@ -45,18 +45,12 @@ public final class NowsInstallerGui {
             NowsInstaller.supportedMinecraftVersions().toArray(new String[0]));
     private final JTextField minecraftDir = new JTextField(defaultMinecraftDir());
     private final JTextField gameDir = new JTextField(defaultGameDir());
-    private final JTextField manifest = new JTextField();
-    private final JTextField artifactDir = new JTextField();
-    private final JCheckBox offline = new JCheckBox("Offline install");
     private final JCheckBox profileGameDir = new JCheckBox("Use a separate game folder for this Nows profile");
     private final JButton gameDirBrowse = new JButton("Browse");
-    private final JButton manifestBrowse = new JButton("Browse");
-    private final JButton artifactDirBrowse = new JButton("Browse");
-    private final JButton install = new JButton("Install");
+    private final JButton install = new JButton("Install Nows");
     private final JButton advanced = squareButton("...");
     private final JLabel minecraftDirStatus = new JLabel(" ");
     private final JLabel installHint = new JLabel(" ");
-    private final JLabel offlineHint = new JLabel(" ");
     private final JTextArea log = new JTextArea();
 
     private NowsInstallerGui() {
@@ -69,11 +63,8 @@ public final class NowsInstallerGui {
         frame.add(actions(), BorderLayout.SOUTH);
         frame.getRootPane().setDefaultButton(install);
 
-        offline.addActionListener(event -> updateOfflineFields());
         profileGameDir.addActionListener(event -> updateGameDirFields());
         gameDirBrowse.addActionListener(event -> choose(gameDir, JFileChooser.DIRECTORIES_ONLY));
-        manifestBrowse.addActionListener(event -> choose(manifest, JFileChooser.FILES_ONLY));
-        artifactDirBrowse.addActionListener(event -> choose(artifactDir, JFileChooser.DIRECTORIES_ONLY));
         minecraftVersion.addActionListener(event -> updateDefaultGameDir());
         minecraftDir.getDocument().addDocumentListener(new SimpleDocumentListener() {
             @Override
@@ -83,7 +74,6 @@ public final class NowsInstallerGui {
                 updateInstallHint();
             }
         });
-        updateOfflineFields();
         updateGameDirFields();
         updateMinecraftDirStatus();
         updateInstallHint();
@@ -157,11 +147,6 @@ public final class NowsInstallerGui {
             install.setEnabled(true);
             return;
         }
-        if (offline.isSelected() && !validateOfflineInputs()) {
-            install.setEnabled(true);
-            return;
-        }
-
         final String[] args = installerArgs();
         new SwingWorker<Void, String>() {
             @Override
@@ -205,11 +190,6 @@ public final class NowsInstallerGui {
         addOption(args, "--nows", nowsVersion.getText());
         addOption(args, "--minecraft", selectedMinecraftVersion());
         addOption(args, "--minecraftDir", minecraftDir.getText());
-        if (offline.isSelected()) {
-            args.add("--offline");
-            addOption(args, "--manifest", manifest.getText());
-            addOption(args, "--artifactDir", artifactDir.getText());
-        }
         if (profileGameDir.isSelected()) {
             addOption(args, "--gameDir", gameDir.getText());
         }
@@ -263,7 +243,7 @@ public final class NowsInstallerGui {
         browse.addActionListener(event -> choose(minecraftDir, JFileChooser.DIRECTORIES_ONLY));
         detect.addActionListener(event -> detectMinecraftDir());
         defaults.addActionListener(event -> minecraftDir.setText(NowsInstaller.defaultMinecraftDir().toString()));
-        advanced.setToolTipText("Advanced profile and offline options");
+        advanced.setToolTipText("Advanced profile options");
         advanced.addActionListener(event -> showAdvancedOptions());
         buttons.add(browse);
         buttons.add(detect);
@@ -302,17 +282,6 @@ public final class NowsInstallerGui {
         fields.add(profileGameDir, profileGbc);
         addRow(fields, 1, "Profile game folder", gameDir, buttonPanel(gameDirBrowse));
 
-        GridBagConstraints offlineGbc = constraints(2, 0);
-        offlineGbc.gridwidth = 3;
-        fields.add(offline, offlineGbc);
-        addRow(fields, 3, "Manifest file", manifest, buttonPanel(manifestBrowse));
-        addRow(fields, 4, "Artifact folder", artifactDir, buttonPanel(artifactDirBrowse));
-
-        GridBagConstraints hintGbc = constraints(5, 1);
-        hintGbc.gridwidth = 2;
-        hintGbc.fill = GridBagConstraints.HORIZONTAL;
-        fields.add(offlineHint, hintGbc);
-
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         JButton done = new JButton("Done");
         done.addActionListener(event -> dialog.dispose());
@@ -321,10 +290,9 @@ public final class NowsInstallerGui {
         panel.add(fields, BorderLayout.CENTER);
         panel.add(actions, BorderLayout.SOUTH);
         dialog.setContentPane(panel);
-        updateOfflineFields();
         updateGameDirFields();
         dialog.pack();
-        dialog.setMinimumSize(new Dimension(620, dialog.getHeight()));
+        dialog.setMinimumSize(new Dimension(520, dialog.getHeight()));
         dialog.setLocationRelativeTo(frame);
         dialog.setVisible(true);
     }
@@ -355,17 +323,6 @@ public final class NowsInstallerGui {
         }
         minecraftDir.setText(candidates.get(0).toString());
         append("[NowsInstaller] No existing Minecraft folder found. Using default path: " + candidates.get(0));
-    }
-
-    private void updateOfflineFields() {
-        boolean enabled = offline.isSelected();
-        manifest.setEnabled(enabled);
-        artifactDir.setEnabled(enabled);
-        manifestBrowse.setEnabled(enabled);
-        artifactDirBrowse.setEnabled(enabled);
-        offlineHint.setText(enabled
-                ? "Offline install uses the selected local manifest and artifacts folder."
-                : "Online install downloads the release manifest and artifacts over HTTPS.");
     }
 
     private void updateGameDirFields() {
@@ -434,31 +391,6 @@ public final class NowsInstallerGui {
         return choice == JOptionPane.YES_OPTION;
     }
 
-    private boolean validateOfflineInputs() {
-        String manifestText = manifest.getText();
-        if (manifestText == null || manifestText.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(frame, "Choose a local manifest file for offline install.",
-                    "Manifest required", JOptionPane.WARNING_MESSAGE);
-            return false;
-        }
-        Path manifestPath = Paths.get(manifestText.trim()).toAbsolutePath().normalize();
-        if (!Files.isRegularFile(manifestPath)) {
-            JOptionPane.showMessageDialog(frame, "Manifest file was not found:\n" + manifestPath,
-                    "Manifest not found", JOptionPane.WARNING_MESSAGE);
-            return false;
-        }
-        String artifactText = artifactDir.getText();
-        if (artifactText != null && !artifactText.trim().isEmpty()) {
-            Path artifactsPath = Paths.get(artifactText.trim()).toAbsolutePath().normalize();
-            if (!Files.isDirectory(artifactsPath)) {
-                JOptionPane.showMessageDialog(frame, "Artifact folder was not found:\n" + artifactsPath,
-                        "Artifact folder not found", JOptionPane.WARNING_MESSAGE);
-                return false;
-            }
-        }
-        return true;
-    }
-
     private String friendlyError(Throwable cause) {
         String message = cause.getMessage();
         if (message == null || message.trim().isEmpty()) {
@@ -466,7 +398,7 @@ public final class NowsInstallerGui {
         }
         if (cause instanceof SSLException) {
             return "HTTPS connection failed. Check your network, system clock, Java certificate store, "
-                    + "or try an offline install from Advanced options.\n\n" + message;
+                    + "or use the separate offline installer JAR.\n\n" + message;
         }
         return message;
     }
