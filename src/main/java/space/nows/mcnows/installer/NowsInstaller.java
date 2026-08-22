@@ -1,5 +1,7 @@
 package space.nows.mcnows.installer;
 
+import space.nows.mcnows.remap.MinecraftJarRemapper;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -26,7 +28,6 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-import java.util.jar.JarFile;
 
 /**
  * Internet-first Nows installer.
@@ -318,10 +319,7 @@ public final class NowsInstaller {
         Path versionDir = options.minecraftDir.resolve("versions").resolve(profile);
         Files.createDirectories(versionDir);
         Path profileJar = versionDir.resolve(profile + ".jar");
-        boolean hasProfileJar = installClientJar(options, manifest, profileJar);
-        if (!hasProfileJar) {
-            hasProfileJar = copyInheritedVersionJar(options, profileJar);
-        }
+        boolean hasProfileJar = prepareMinecraftClientJar(options, profileJar);
         StringBuilder json = new StringBuilder();
 
         json.append("{\n");
@@ -333,10 +331,6 @@ public final class NowsInstaller {
             json.append("  \"downloads\": {\"client\":{");
             json.append("\"sha1\":").append(quote(sha1(profileJar))).append(',');
             json.append("\"size\":").append(Files.size(profileJar));
-            String clientJarUrl = manifest.getProperty("clientJar.url", "").trim();
-            if (!isBlank(clientJarUrl)) {
-                json.append(",\"url\":").append(quote(clientJarUrl));
-            }
             json.append("}},\n");
         }
         json.append("  \"mainClass\": ")
@@ -376,85 +370,81 @@ public final class NowsInstaller {
         return profile;
     }
 
-    private static boolean installClientJar(Options options, Properties manifest, Path destination) throws Exception {
-        String relativePath = manifest.getProperty("clientJar.path", "").trim().replace('\\', '/');
-        if (isBlank(relativePath)) {
-            return false;
-        }
-        String source = manifest.getProperty("clientJar.source", "internet").trim();
-        String expectedSha256 = manifest.getProperty("clientJar.sha256", "").trim();
-        String sourceUrl = manifest.getProperty("clientJar.url", "").trim();
-
-        Files.createDirectories(destination.getParent());
-        if (Files.isRegularFile(destination)
-                && !expectedSha256.isEmpty()
-                && sha256(destination).equalsIgnoreCase(expectedSha256)
-                && containsNamedMinecraft(destination)) {
+    private static boolean prepareMinecraftClientJar(Options options, Path target) throws Exception {
+        if (Files.isRegularFile(target) && MinecraftJarRemapper.containsNamedMinecraft(target)) {
             return true;
         }
 
-        if (source.equals("embedded")) {
-            copyEmbedded(required(manifest, "clientJar.resource"), destination);
-        } else if (options.embeddedArtifacts) {
-            copyEmbedded("/META-INF/nows/offline-client/" + relativePath, destination);
-        } else if (options.offline) {
-            copyLocalClientJar(options, manifest, relativePath, destination);
-        } else if (source.equals("internet")) {
-            if (isBlank(sourceUrl)) {
-                throw new IllegalArgumentException("Missing URL for client jar: " + relativePath);
-            }
-            downloadInternet(sourceUrl, destination);
-        } else if (source.equals("local")) {
-            copyLocalClientJar(options, manifest, relativePath, destination);
-        } else {
-            throw new IllegalArgumentException("Unknown client jar source '" + source + "' for " + relativePath);
+        Path inherited = inheritedVersionJar(options);
+        if (Files.isRegularFile(inherited)) {
+            return prepareMinecraftClientJar(options, inherited, null, target);
         }
 
-        if (!expectedSha256.isEmpty()) {
-            String actual = sha256(destination);
-            if (!actual.equalsIgnoreCase(expectedSha256)) {
-                Files.deleteIfExists(destination);
-                throw new IOException("SHA-256 mismatch for client jar " + relativePath + ": expected "
-                        + expectedSha256 + ", got " + actual);
-            }
+        if (options.offline) {
+            return false;
         }
-        if (!containsNamedMinecraft(destination)) {
-            Files.deleteIfExists(destination);
-            throw new IOException("Client jar is not Mojang-named: " + relativePath);
+
+        Map<String, Object> versionJson = resolveMojangVersion(options.minecraftVersion);
+        DownloadSpec client = DownloadSpec.from(jsonObject(
+                jsonObject(versionJson.get("downloads"), "downloads").get("client"),
+                "downloads.client"));
+        Path cached = minecraftCacheDir(options).resolve("client-runtime.jar");
+        downloadVerified(client, cached);
+        return prepareMinecraftClientJar(options, cached, versionJson, target);
+    }
+
+    private static boolean prepareMinecraftClientJar(
+            Options options,
+            Path source,
+            Map<String, Object> versionJson,
+            Path target
+    ) throws Exception {
+        Files.createDirectories(target.getParent());
+        if (MinecraftJarRemapper.containsNamedMinecraft(source)) {
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+            return true;
+        }
+
+        if (options.offline) {
+            throw new IOException("Minecraft " + options.minecraftVersion
+                    + " uses an obfuscated client jar. Preparing a Mojang-named local profile jar requires "
+                    + "Mojang's official client mappings; run the internet installer once for this Minecraft version.");
+        }
+
+        if (versionJson == null) {
+            versionJson = resolveMojangVersion(options.minecraftVersion);
+        }
+        Object mappingObject = jsonObject(versionJson.get("downloads"), "downloads").get("client_mappings");
+        if (mappingObject == null) {
+            throw new IOException("Minecraft " + options.minecraftVersion + " has no official client mappings");
+        }
+
+        DownloadSpec mappings = DownloadSpec.from(jsonObject(mappingObject, "downloads.client_mappings"));
+        Path mappingFile = minecraftCacheDir(options).resolve("client_mappings.txt");
+        downloadVerified(mappings, mappingFile);
+        MinecraftJarRemapper.remapOfficial(source, mappingFile, target);
+        if (!MinecraftJarRemapper.containsNamedMinecraft(target)) {
+            Files.deleteIfExists(target);
+            throw new IOException("Prepared Minecraft client jar is not Mojang-named: " + target);
         }
         return true;
     }
 
-    private static void copyLocalClientJar(
-            Options options,
-            Properties manifest,
-            String relativePath,
-            Path destination
-    ) throws IOException {
-        Path source = localArtifactPath(options, manifest.getProperty("clientJar.file", "").trim(), relativePath);
-        if (!Files.isRegularFile(source)) {
-            throw new IOException("Offline client jar missing: " + source);
-        }
-        Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    private static boolean copyInheritedVersionJar(Options options, Path target) throws IOException {
-        Path source = options.minecraftDir
+    private static Path inheritedVersionJar(Options options) {
+        return options.minecraftDir
                 .resolve("versions")
                 .resolve(options.minecraftVersion)
                 .resolve(options.minecraftVersion + ".jar");
-        if (!Files.isRegularFile(source)) {
-            return false;
-        }
-        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-        return true;
     }
 
-    private static boolean containsNamedMinecraft(Path jar) throws IOException {
-        try (JarFile file = new JarFile(jar.toFile())) {
-            return file.getEntry("net/minecraft/client/Minecraft.class") != null
-                    && file.getEntry("net/minecraft/client/main/Main.class") != null;
-        }
+    private static Path minecraftCacheDir(Options options) throws IOException {
+        Path dir = options.minecraftDir
+                .resolve("nows")
+                .resolve("cache")
+                .resolve("minecraft")
+                .resolve(options.minecraftVersion);
+        Files.createDirectories(dir);
+        return dir;
     }
 
     @SuppressWarnings("unchecked")
@@ -644,6 +634,75 @@ public final class NowsInstaller {
             connection.disconnect();
         }
         Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static Map<String, Object> resolveMojangVersion(String id) throws Exception {
+        Map<String, Object> manifest = downloadJsonObject("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+        List<Object> versions = jsonArray(manifest.get("versions"), "versions");
+        for (Object value : versions) {
+            Map<String, Object> version = jsonObject(value, "versions[]");
+            if (id.equals(jsonString(version.get("id"), "versions[].id"))) {
+                return downloadJsonObject(jsonString(version.get("url"), "versions[].url"));
+            }
+        }
+        throw new IOException("Minecraft version not found in Mojang metadata: " + id);
+    }
+
+    private static Map<String, Object> downloadJsonObject(String location) throws Exception {
+        HttpURLConnection connection = openConnection(parseInternetUri(location));
+        try (InputStream input = connection.getInputStream()) {
+            String json = new String(readAllBytes(input), StandardCharsets.UTF_8);
+            return jsonObject(Json.parse(json), location);
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static void downloadVerified(DownloadSpec spec, Path destination) throws Exception {
+        if (isValidDownload(destination, spec)) {
+            return;
+        }
+        download(spec.uri, destination);
+        if (!isValidDownload(destination, spec)) {
+            Files.deleteIfExists(destination);
+            throw new IOException("Minecraft download failed SHA-1/size validation: " + spec.uri);
+        }
+    }
+
+    private static boolean isValidDownload(Path path, DownloadSpec spec) throws IOException {
+        return Files.isRegularFile(path)
+                && Files.size(path) == spec.size
+                && sha1(path).equalsIgnoreCase(spec.sha1);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> jsonObject(Object value, String name) throws IOException {
+        if (value instanceof Map<?, ?>) {
+            return (Map<String, Object>) value;
+        }
+        throw new IOException("Expected JSON object for " + name);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> jsonArray(Object value, String name) throws IOException {
+        if (value instanceof List<?>) {
+            return (List<Object>) value;
+        }
+        throw new IOException("Expected JSON array for " + name);
+    }
+
+    private static String jsonString(Object value, String name) throws IOException {
+        if (value instanceof String) {
+            return (String) value;
+        }
+        throw new IOException("Expected JSON string for " + name);
+    }
+
+    private static long jsonLong(Object value, String name) throws IOException {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        throw new IOException("Expected JSON number for " + name);
     }
 
     private static HttpURLConnection openConnection(URI uri) throws IOException {
@@ -1211,6 +1270,25 @@ public final class NowsInstaller {
         String relativePath() { return relativePath; }
         String sourceUrl() { return sourceUrl; }
         Path file() { return file; }
+    }
+
+    private static final class DownloadSpec {
+        private final URI uri;
+        private final String sha1;
+        private final long size;
+
+        private DownloadSpec(URI uri, String sha1, long size) {
+            this.uri = uri;
+            this.sha1 = sha1;
+            this.size = size;
+        }
+
+        static DownloadSpec from(Map<String, Object> object) throws IOException {
+            return new DownloadSpec(
+                    parseInternetUri(jsonString(object.get("url"), "download.url")),
+                    jsonString(object.get("sha1"), "download.sha1"),
+                    jsonLong(object.get("size"), "download.size"));
+        }
     }
 
     static final class Options {

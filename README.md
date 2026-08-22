@@ -1,6 +1,6 @@
 # NowsInstaller
 
-Internet-first Official Launcher installer for Nows, plus a separate offline installer JAR for fully embedded releases.
+Internet-first Official Launcher installer for Nows, plus a separate offline installer JAR with embedded Nows artifacts.
 
 The installer itself contains no loader architecture. It reads `install.properties` from `files.nows.space`, installs each declared artifact under `.minecraft/libraries`, writes an inherited Launcher version whose `mainClass` is `space.nows.mcnows.runtime.NowsLauncher`, then merges a Nows installation entry into `launcher_profiles.json`.
 
@@ -81,9 +81,9 @@ https://files.nows.space/releases/nows/<nows-version>/<minecraft-version>/instal
 
 Use `install.properties.template` as the release template. Release automation should fill SHA-256 values before publishing. For `source=internet` artifacts, the normal installer first tries `artifact.<n>.url`; if that download fails or the URL is missing, it falls back to `artifact.<n>.mavenUrl` or `mavenBaseUrl + artifact.<n>.path`. External downloads must use HTTPS; plain HTTP is accepted only for localhost development.
 
-Release manifests may also declare `clientJar.path`, `clientJar.url` and `clientJar.sha256`. This prepared client JAR is installed as the Launcher profile JAR and written to the profile version JSON as `downloads.client`, so the Official Launcher validates the remapped JAR instead of re-downloading the inherited vanilla client. Legacy Minecraft versions that ship obfuscated client jars should publish a Mojang-named `client-dev.jar` there, produced by the Nows Gradle remapper.
+Release manifests should not publish or reference Minecraft client JARs. NowsInstaller prepares the profile client JAR locally from the user's existing vanilla Minecraft install or from Mojang's official download metadata. Legacy Minecraft versions that ship obfuscated client JARs are remapped locally with Mojang's official client mappings during install.
 
-The manifest may also include `mod.<n>` companion mod entries. These are copied to the active game folder's `mods` directory. The 0.4.0 default manifest does not use this for `NowsApiMod`; the title-screen badge is provided by the required `mc/<minecraft-version>` adapter instead.
+The manifest may also include `mod.<n>` companion mod entries. These are copied to the active game folder's `mods` directory. The 0.5.0 default manifest does not use this for `NowsApiMod`; the title-screen badge is provided by the required `mc/<minecraft-version>` adapter instead.
 
 ## Published installer
 
@@ -99,7 +99,7 @@ The offline installer is published beside it:
 .publishing/releases/nows/<nows-version>/installers/NowsInstallerOffline-<nows-version>-mc-<minecraft-version>.jar
 ```
 
-This JAR embeds the release manifest, Nows libraries, public runtime libraries and prepared Mojang-named `client-dev.jar`. Run it without `--manifest` or `--artifactDir`; only launcher/profile options such as `--minecraftDir` and `--gameDir` are needed.
+This JAR embeds the release manifest, Nows libraries and public runtime libraries. It does not embed Minecraft client files. Run it without `--manifest` or `--artifactDir`; only launcher/profile options such as `--minecraftDir` and `--gameDir` are needed. If the target vanilla client is not already available locally, the installer may still contact Mojang's official services to prepare the local launcher profile.
 
 ## Offline local testing
 
@@ -116,9 +116,7 @@ java -cp build/libs/NowsInstaller-<version>.jar space.nows.mcnows.installer.Nows
 The local `install.properties` still uses the normal `artifact.*.path` values. For artifacts whose source is `internet`, place each JAR under `--artifactDir` using that same relative path, for example:
 
 ```text
-/path/to/offline-libraries/space/nows/mcnows/nows-core/0.4.0/nows-core-0.4.0.jar
+/path/to/offline-libraries/space/nows/mcnows/nows-core/0.5.0/nows-core-0.5.0.jar
 ```
-
-Generated release manifests set `clientJar.file=../client/client-dev.jar`, so offline installs can keep using `--artifactDir /path/to/release/libraries` while the prepared client JAR lives at `/path/to/release/client/client-dev.jar`.
 
 Artifacts marked `source=embedded` are still copied from inside the installer JAR. A manifest may also set `artifact.<n>.source=local` and `artifact.<n>.file=relative/or/absolute.jar` for one-off local test jars.
