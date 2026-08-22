@@ -329,6 +329,15 @@ public final class NowsInstaller {
         json.append("  \"inheritsFrom\": ").append(quote(options.minecraftVersion)).append(",\n");
         if (!hasProfileJar) {
             json.append("  \"jar\": ").append(quote(options.minecraftVersion)).append(",\n");
+        } else {
+            json.append("  \"downloads\": {\"client\":{");
+            json.append("\"sha1\":").append(quote(sha1(profileJar))).append(',');
+            json.append("\"size\":").append(Files.size(profileJar));
+            String clientJarUrl = manifest.getProperty("clientJar.url", "").trim();
+            if (!isBlank(clientJarUrl)) {
+                json.append(",\"url\":").append(quote(clientJarUrl));
+            }
+            json.append("}},\n");
         }
         json.append("  \"mainClass\": ")
                 .append(quote(manifest.getProperty("mainClass", "space.nows.mcnows.runtime.NowsLauncher")))

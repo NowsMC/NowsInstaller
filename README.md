@@ -80,7 +80,7 @@ https://files.nows.space/releases/nows/<nows-version>/<minecraft-version>/instal
 
 Use `install.properties.template` as the release template. Release automation should fill SHA-256 values before publishing. For `source=internet` artifacts, the normal installer first tries `artifact.<n>.url`; if that download fails or the URL is missing, it falls back to `artifact.<n>.mavenUrl` or `mavenBaseUrl + artifact.<n>.path`. External downloads must use HTTPS; plain HTTP is accepted only for localhost development.
 
-Release manifests may also declare `clientJar.path`, `clientJar.url` and `clientJar.sha256`. This prepared client JAR is installed as the Launcher profile JAR before the inherited version JSON is written. Legacy Minecraft versions that ship obfuscated client jars should publish a Mojang-named `client-dev.jar` there, produced by the Nows Gradle remapper.
+Release manifests may also declare `clientJar.path`, `clientJar.url` and `clientJar.sha256`. This prepared client JAR is installed as the Launcher profile JAR and written to the profile version JSON as `downloads.client`, so the Official Launcher validates the remapped JAR instead of re-downloading the inherited vanilla client. Legacy Minecraft versions that ship obfuscated client jars should publish a Mojang-named `client-dev.jar` there, produced by the Nows Gradle remapper.
 
 The manifest may also include `mod.<n>` companion mod entries. These are copied to the active game folder's `mods` directory. The 0.4.0 default manifest does not use this for `NowsApiMod`; the title-screen badge is provided by the required `mc/<minecraft-version>` adapter instead.
 
