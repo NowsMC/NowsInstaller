@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package space.nows.mcnows.installer;
+package space.nows.installer;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;

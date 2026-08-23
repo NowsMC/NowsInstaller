@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package space.nows.mcnows.installer;
+package space.nows.installer;
 
-import space.nows.mcnows.remap.MinecraftJarRemapper;
+import space.nows.remap.MinecraftJarRemapper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -122,7 +122,7 @@ public final class NowsInstaller {
         } else if (options.writesMultiMcPack()) {
             installMultiMcPack(options, profile, launcherLibraries);
             listener.log("[NowsInstaller] instance pack: " + options.instanceDir.resolve("mmc-pack.json"));
-            listener.log("[NowsInstaller] instance patch: " + options.instanceDir.resolve("patches").resolve("space.nows.mcnows.json"));
+            listener.log("[NowsInstaller] instance patch: " + options.instanceDir.resolve("patches").resolve("space.nows.json"));
         } else {
             installInstanceReference(options, profile);
             listener.log("[NowsInstaller] instance reference: "
@@ -374,7 +374,7 @@ public final class NowsInstaller {
             json.append("}},\n");
         }
         json.append("  \"mainClass\": ")
-                .append(quote(manifest.getProperty("mainClass", "space.nows.mcnows.runtime.NowsLauncher")))
+                .append(quote(manifest.getProperty("mainClass", "space.nows.loader.runtime.NowsLauncher")))
                 .append(",\n");
         json.append("  \"type\": \"release\",\n");
         json.append("  \"time\": ").append(quote(now.toString())).append(",\n");
@@ -722,7 +722,7 @@ public final class NowsInstaller {
         Path patchesDir = instanceDir.resolve("patches");
         Files.createDirectories(patchesDir);
         copyMultiMcLibraries(instanceDir, libraries);
-        writeMultiMcPatch(options, versionProfile, libraries, patchesDir.resolve("space.nows.mcnows.json"));
+        writeMultiMcPatch(options, versionProfile, libraries, patchesDir.resolve("space.nows.json"));
         writeMultiMcPack(options, instanceDir.resolve("mmc-pack.json"));
         installInstanceReference(options, versionProfile);
     }
@@ -744,7 +744,7 @@ public final class NowsInstaller {
     ) throws IOException {
         Map<String, Object> patch = new LinkedHashMap<>();
         patch.put("formatVersion", 1);
-        patch.put("uid", "space.nows.mcnows");
+        patch.put("uid", "space.nows");
         patch.put("name", "Nows");
         patch.put("version", options.nowsVersion);
         patch.put("type", "release");
@@ -755,7 +755,7 @@ public final class NowsInstaller {
         List<Object> requirements = new ArrayList<>();
         requirements.add(minecraftRequirement);
         patch.put("requires", requirements);
-        patch.put("mainClass", "space.nows.mcnows.runtime.NowsLauncher");
+        patch.put("mainClass", "space.nows.loader.runtime.NowsLauncher");
         List<Object> jvmArgs = new ArrayList<>();
         jvmArgs.add("-Dnows.minecraftVersion=" + options.minecraftVersion);
         jvmArgs.add("-Dnows.profileId=" + versionProfile);
@@ -844,7 +844,7 @@ public final class NowsInstaller {
         Map<String, Object> component = new LinkedHashMap<>();
         component.put("cachedName", "Nows");
         component.put("cachedVersion", options.nowsVersion);
-        component.put("uid", "space.nows.mcnows");
+        component.put("uid", "space.nows");
         component.put("version", options.nowsVersion);
         return component;
     }
@@ -1639,7 +1639,7 @@ public final class NowsInstaller {
         Path file() { return file; }
 
         boolean isMinecraftAdapter() {
-            return coordinate.startsWith("space.nows.mcnows:nows-mc-");
+            return coordinate.startsWith("space.nows:nows-mc-");
         }
     }
 

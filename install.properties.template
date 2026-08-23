@@ -1,7 +1,7 @@
 format=1
 nows.version=${nows.version}
 minecraft.version=26.2
-mainClass=space.nows.mcnows.runtime.NowsLauncher
+mainClass=space.nows.loader.runtime.NowsLauncher
 mavenBaseUrl=https://repo1.maven.org/maven2
 
 # Do not publish Minecraft client jars in Nows release manifests.
@@ -11,27 +11,27 @@ mavenBaseUrl=https://repo1.maven.org/maven2
 # Nows modular jars are downloaded from files.nows.space. Keep these independently replaceable.
 # If files.nows.space is unavailable, NowsInstaller falls back to mavenBaseUrl + artifact path.
 artifact.count=26
-artifact.0.coordinate=space.nows.mcnows:nows-core:${nows.version}
-artifact.0.path=space/nows/mcnows/nows-core/${nows.version}/nows-core-${nows.version}.jar
-artifact.0.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-core/${nows.version}/nows-core-${nows.version}.jar
-artifact.1.coordinate=space.nows.mcnows:nows-minecraft:${nows.version}
-artifact.1.path=space/nows/mcnows/nows-minecraft/${nows.version}/nows-minecraft-${nows.version}.jar
-artifact.1.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-minecraft/${nows.version}/nows-minecraft-${nows.version}.jar
-artifact.2.coordinate=space.nows.mcnows:nows-integration-kdl:${nows.version}
-artifact.2.path=space/nows/mcnows/nows-integration-kdl/${nows.version}/nows-integration-kdl-${nows.version}.jar
-artifact.2.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-integration-kdl/${nows.version}/nows-integration-kdl-${nows.version}.jar
-artifact.3.coordinate=space.nows.mcnows:nows-integration-geb:${nows.version}
-artifact.3.path=space/nows/mcnows/nows-integration-geb/${nows.version}/nows-integration-geb-${nows.version}.jar
-artifact.3.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-integration-geb/${nows.version}/nows-integration-geb-${nows.version}.jar
-artifact.4.coordinate=space.nows.mcnows:nows-integration-logging:${nows.version}
-artifact.4.path=space/nows/mcnows/nows-integration-logging/${nows.version}/nows-integration-logging-${nows.version}.jar
-artifact.4.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-integration-logging/${nows.version}/nows-integration-logging-${nows.version}.jar
-artifact.5.coordinate=space.nows.mcnows:nows-integration-mixin:${nows.version}
-artifact.5.path=space/nows/mcnows/nows-integration-mixin/${nows.version}/nows-integration-mixin-${nows.version}.jar
-artifact.5.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-integration-mixin/${nows.version}/nows-integration-mixin-${nows.version}.jar
-artifact.6.coordinate=space.nows.mcnows:nows-runtime:${nows.version}
-artifact.6.path=space/nows/mcnows/nows-runtime/${nows.version}/nows-runtime-${nows.version}.jar
-artifact.6.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-runtime/${nows.version}/nows-runtime-${nows.version}.jar
+artifact.0.coordinate=space.nows:nows-core:${nows.version}
+artifact.0.path=space/nows/nows-core/${nows.version}/nows-core-${nows.version}.jar
+artifact.0.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-core/${nows.version}/nows-core-${nows.version}.jar
+artifact.1.coordinate=space.nows:nows-minecraft:${nows.version}
+artifact.1.path=space/nows/nows-minecraft/${nows.version}/nows-minecraft-${nows.version}.jar
+artifact.1.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-minecraft/${nows.version}/nows-minecraft-${nows.version}.jar
+artifact.2.coordinate=space.nows:nows-integration-kdl:${nows.version}
+artifact.2.path=space/nows/nows-integration-kdl/${nows.version}/nows-integration-kdl-${nows.version}.jar
+artifact.2.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-integration-kdl/${nows.version}/nows-integration-kdl-${nows.version}.jar
+artifact.3.coordinate=space.nows:nows-integration-geb:${nows.version}
+artifact.3.path=space/nows/nows-integration-geb/${nows.version}/nows-integration-geb-${nows.version}.jar
+artifact.3.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-integration-geb/${nows.version}/nows-integration-geb-${nows.version}.jar
+artifact.4.coordinate=space.nows:nows-integration-logging:${nows.version}
+artifact.4.path=space/nows/nows-integration-logging/${nows.version}/nows-integration-logging-${nows.version}.jar
+artifact.4.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-integration-logging/${nows.version}/nows-integration-logging-${nows.version}.jar
+artifact.5.coordinate=space.nows:nows-integration-mixin:${nows.version}
+artifact.5.path=space/nows/nows-integration-mixin/${nows.version}/nows-integration-mixin-${nows.version}.jar
+artifact.5.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-integration-mixin/${nows.version}/nows-integration-mixin-${nows.version}.jar
+artifact.6.coordinate=space.nows:nows-runtime:${nows.version}
+artifact.6.path=space/nows/nows-runtime/${nows.version}/nows-runtime-${nows.version}.jar
+artifact.6.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-runtime/${nows.version}/nows-runtime-${nows.version}.jar
 
 # KDL4J: resolved from JitPack first, bundled inside NowsInstaller, and copied out.
 artifact.7.coordinate=com.github.kdl-org:kdl4j:v1.0.1
@@ -74,12 +74,12 @@ artifact.17.path=org/ow2/asm/asm-util/9.8/asm-util-9.8.jar
 artifact.17.url=https://repo1.maven.org/maven2/org/ow2/asm/asm-util/9.8/asm-util-9.8.jar
 
 # Version-specific Minecraft API adapter for the default installer target.
-artifact.18.coordinate=space.nows.mcnows:nows-mc-26.2:${nows.version}
-artifact.18.path=space/nows/mcnows/nows-mc-26.2/${nows.version}/nows-mc-26.2-${nows.version}.jar
-artifact.18.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-mc-26.2/${nows.version}/nows-mc-26.2-${nows.version}.jar
-artifact.19.coordinate=space.nows.mcnows:nows-integration-network:${nows.version}
-artifact.19.path=space/nows/mcnows/nows-integration-network/${nows.version}/nows-integration-network-${nows.version}.jar
-artifact.19.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/mcnows/nows-integration-network/${nows.version}/nows-integration-network-${nows.version}.jar
+artifact.18.coordinate=space.nows:nows-mc-26.2:${nows.version}
+artifact.18.path=space/nows/nows-mc-26.2/${nows.version}/nows-mc-26.2-${nows.version}.jar
+artifact.18.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-mc-26.2/${nows.version}/nows-mc-26.2-${nows.version}.jar
+artifact.19.coordinate=space.nows:nows-integration-network:${nows.version}
+artifact.19.path=space/nows/nows-integration-network/${nows.version}/nows-integration-network-${nows.version}.jar
+artifact.19.url=https://files.nows.space/releases/nows/${nows.version}/26.2/libraries/space/nows/nows-integration-network/${nows.version}/nows-integration-network-${nows.version}.jar
 artifact.20.coordinate=com.squareup.moshi:moshi:1.15.2
 artifact.20.path=com/squareup/moshi/moshi/1.15.2/moshi-1.15.2.jar
 artifact.20.url=https://repo1.maven.org/maven2/com/squareup/moshi/moshi/1.15.2/moshi-1.15.2.jar

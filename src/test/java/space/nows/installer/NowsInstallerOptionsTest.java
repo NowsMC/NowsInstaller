@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package space.nows.mcnows.installer;
+package space.nows.installer;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -79,7 +79,7 @@ class NowsInstallerOptionsTest {
         NowsInstaller.Options options = NowsInstaller.Options.parse(new String[] {
                 "--offline",
                 "--manifest", manifest.toString(),
-                "--nows", "0.7.0",
+                "--nows", "0.8.0",
                 "--minecraft", "1.20.1",
                 "--launcher", "prism",
                 "--minecraftDir", minecraftDir.toString(),
@@ -93,15 +93,15 @@ class NowsInstallerOptionsTest {
         NowsInstaller.install(options, message -> {});
 
         String pack = new String(Files.readAllBytes(instanceDir.resolve("mmc-pack.json")), StandardCharsets.UTF_8);
-        String patch = new String(Files.readAllBytes(instanceDir.resolve("patches").resolve("space.nows.mcnows.json")), StandardCharsets.UTF_8);
-        assertTrue(pack.contains("\"uid\": \"space.nows.mcnows\""));
-        assertTrue(patch.contains("\"mainClass\": \"space.nows.mcnows.runtime.NowsLauncher\""));
+        String patch = new String(Files.readAllBytes(instanceDir.resolve("patches").resolve("space.nows.json")), StandardCharsets.UTF_8);
+        assertTrue(pack.contains("\"uid\": \"space.nows\""));
+        assertTrue(patch.contains("\"mainClass\": \"space.nows.loader.runtime.NowsLauncher\""));
         assertTrue(patch.contains("-Dnows.minecraftVersion=1.20.1"));
-        assertTrue(patch.contains("-Dnows.profileId=nows-0.7.0-1.20.1"));
+        assertTrue(patch.contains("-Dnows.profileId=nows-0.8.0-1.20.1"));
         assertTrue(patch.contains("-Dnows.minecraftAdapterPath="));
-        assertTrue(patch.contains("nows-mc-1.20.1-0.7.0.jar"));
-        assertTrue(patch.contains("\"name\": \"space.nows.mcnows:nows-runtime:0.7.0\""));
-        assertFalse(patch.contains("\"name\": \"space.nows.mcnows:nows-mc-1.20.1:0.7.0\""));
+        assertTrue(patch.contains("nows-mc-1.20.1-0.8.0.jar"));
+        assertTrue(patch.contains("\"name\": \"space.nows:nows-runtime:0.8.0\""));
+        assertFalse(patch.contains("\"name\": \"space.nows:nows-mc-1.20.1:0.8.0\""));
     }
 
     @Test
@@ -115,14 +115,14 @@ class NowsInstallerOptionsTest {
             NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
                     "--offline",
                     "--manifest", manifest.toString(),
-                    "--nows", "0.7.0",
+                    "--nows", "0.8.0",
                     "--minecraft", minecraftVersion,
                     "--minecraftDir", minecraftDir.toString()
             }), message -> {});
             String profileJson = new String(Files.readAllBytes(minecraftDir
                     .resolve("versions")
-                    .resolve("nows-0.7.0-" + minecraftVersion)
-                    .resolve("nows-0.7.0-" + minecraftVersion + ".json")), StandardCharsets.UTF_8);
+                    .resolve("nows-0.8.0-" + minecraftVersion)
+                    .resolve("nows-0.8.0-" + minecraftVersion + ".json")), StandardCharsets.UTF_8);
             assertLauncherMetadataUsesAdapterPath(profileJson, minecraftVersion);
 
             Path prismMinecraftDir = temp.resolve("prism-root-" + minecraftVersion);
@@ -131,7 +131,7 @@ class NowsInstallerOptionsTest {
             NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
                     "--offline",
                     "--manifest", manifest.toString(),
-                    "--nows", "0.7.0",
+                    "--nows", "0.8.0",
                     "--minecraft", minecraftVersion,
                     "--launcher", "prism",
                     "--minecraftDir", prismMinecraftDir.toString(),
@@ -139,7 +139,7 @@ class NowsInstallerOptionsTest {
             }), message -> {});
             String prismPatch = new String(Files.readAllBytes(instanceDir
                     .resolve("patches")
-                    .resolve("space.nows.mcnows.json")), StandardCharsets.UTF_8);
+                    .resolve("space.nows.json")), StandardCharsets.UTF_8);
             assertLauncherMetadataUsesAdapterPath(prismPatch, minecraftVersion);
         }
     }
@@ -155,15 +155,15 @@ class NowsInstallerOptionsTest {
             NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
                     "--offline",
                     "--manifest", manifest.toString(),
-                    "--nows", "0.7.0",
+                    "--nows", "0.8.0",
                     "--minecraft", minecraftVersion,
                     "--minecraftDir", minecraftDir.toString()
             }), message -> {});
 
             String profileJson = new String(Files.readAllBytes(minecraftDir
                     .resolve("versions")
-                    .resolve("nows-0.7.0-" + minecraftVersion)
-                    .resolve("nows-0.7.0-" + minecraftVersion + ".json")), StandardCharsets.UTF_8);
+                    .resolve("nows-0.8.0-" + minecraftVersion)
+                    .resolve("nows-0.8.0-" + minecraftVersion + ".json")), StandardCharsets.UTF_8);
             NowsInstaller.MinecraftJavaRuntime runtime = NowsInstaller.minecraftJavaRuntime(minecraftVersion);
             assertTrue(profileJson.contains("\"javaVersion\": {\"component\":\"" + runtime.component
                             + "\",\"majorVersion\":" + runtime.majorVersion + "}"),
@@ -191,7 +191,7 @@ class NowsInstallerOptionsTest {
                 NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
                         "--offline",
                         "--manifest", manifest.toString(),
-                        "--nows", "0.7.0",
+                        "--nows", "0.8.0",
                         "--minecraft", "1.18.2",
                         "--minecraftDir", temp.resolve("missing-client-minecraft").toString()
                 }), message -> {}));
@@ -207,7 +207,7 @@ class NowsInstallerOptionsTest {
 
         assertTrue(options.offline);
         assertTrue(options.embeddedArtifacts);
-        assertEquals("0.7.0", options.nowsVersion);
+        assertEquals("0.8.0", options.nowsVersion);
         assertEquals("1.20.1", options.minecraftVersion);
     }
 
@@ -241,21 +241,21 @@ class NowsInstallerOptionsTest {
     }
 
     private void writeManifest(Path manifest, String minecraftVersion) throws Exception {
-        writeArtifact("space/nows/mcnows/nows-runtime/0.7.0/nows-runtime-0.7.0.jar");
-        writeArtifact("space/nows/mcnows/nows-mc-" + minecraftVersion + "/0.7.0/nows-mc-"
-                + minecraftVersion + "-0.7.0.jar");
+        writeArtifact("space/nows/nows-runtime/0.8.0/nows-runtime-0.8.0.jar");
+        writeArtifact("space/nows/nows-mc-" + minecraftVersion + "/0.8.0/nows-mc-"
+                + minecraftVersion + "-0.8.0.jar");
         Files.write(manifest, (""
                 + "format=1\n"
-                + "nows.version=0.7.0\n"
+                + "nows.version=0.8.0\n"
                 + "minecraft.version=" + minecraftVersion + "\n"
-                + "mainClass=space.nows.mcnows.runtime.NowsLauncher\n"
+                + "mainClass=space.nows.loader.runtime.NowsLauncher\n"
                 + "artifact.count=2\n"
-                + "artifact.0.coordinate=space.nows.mcnows:nows-runtime:0.7.0\n"
-                + "artifact.0.path=space/nows/mcnows/nows-runtime/0.7.0/nows-runtime-0.7.0.jar\n"
+                + "artifact.0.coordinate=space.nows:nows-runtime:0.8.0\n"
+                + "artifact.0.path=space/nows/nows-runtime/0.8.0/nows-runtime-0.8.0.jar\n"
                 + "artifact.0.source=local\n"
-                + "artifact.1.coordinate=space.nows.mcnows:nows-mc-" + minecraftVersion + ":0.7.0\n"
-                + "artifact.1.path=space/nows/mcnows/nows-mc-" + minecraftVersion
-                + "/0.7.0/nows-mc-" + minecraftVersion + "-0.7.0.jar\n"
+                + "artifact.1.coordinate=space.nows:nows-mc-" + minecraftVersion + ":0.8.0\n"
+                + "artifact.1.path=space/nows/nows-mc-" + minecraftVersion
+                + "/0.8.0/nows-mc-" + minecraftVersion + "-0.8.0.jar\n"
                 + "artifact.1.source=local\n"
                 + "mod.count=0\n").getBytes(StandardCharsets.UTF_8));
     }
@@ -272,10 +272,10 @@ class NowsInstallerOptionsTest {
     }
 
     private static void assertLauncherMetadataUsesAdapterPath(String metadata, String minecraftVersion) {
-        assertTrue(metadata.contains("space.nows.mcnows:nows-runtime:0.7.0"));
-        assertFalse(metadata.contains("\"name\":\"space.nows.mcnows:nows-mc-" + minecraftVersion + ":0.7.0\""));
-        assertFalse(metadata.contains("\"name\": \"space.nows.mcnows:nows-mc-" + minecraftVersion + ":0.7.0\""));
+        assertTrue(metadata.contains("space.nows:nows-runtime:0.8.0"));
+        assertFalse(metadata.contains("\"name\":\"space.nows:nows-mc-" + minecraftVersion + ":0.8.0\""));
+        assertFalse(metadata.contains("\"name\": \"space.nows:nows-mc-" + minecraftVersion + ":0.8.0\""));
         assertTrue(metadata.contains("-Dnows.minecraftAdapterPath="));
-        assertTrue(metadata.contains("nows-mc-" + minecraftVersion + "-0.7.0.jar"));
+        assertTrue(metadata.contains("nows-mc-" + minecraftVersion + "-0.8.0.jar"));
     }
 }

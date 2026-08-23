@@ -2,7 +2,7 @@
 
 Internet-first installer for Nows, plus per-Minecraft offline installer JARs with embedded Nows artifacts.
 
-The installer itself contains no loader architecture. It reads `install.properties` from `files.nows.space`, installs each declared artifact under the selected Minecraft root's `libraries` directory, writes an inherited Launcher version whose `mainClass` is `space.nows.mcnows.runtime.NowsLauncher`, then either merges a Nows installation entry into `launcher_profiles.json` or writes an instance reference for third-party launchers.
+The installer itself contains no loader architecture. It reads `install.properties` from `files.nows.space`, installs each declared artifact under the selected Minecraft root's `libraries` directory, writes an inherited Launcher version whose `mainClass` is `space.nows.loader.runtime.NowsLauncher`, then either merges a Nows installation entry into `launcher_profiles.json` or writes an instance reference for third-party launchers.
 
 The installer is compiled with Java 8 bytecode so it can run on Java 8 and newer.
 
@@ -43,9 +43,9 @@ java -jar NowsInstallerOffline-<version>-mc-<minecraft-version>.jar \
   --instanceDir /path/to/modrinth/profile
 ```
 
-Supported launcher targets are `official`, `modrinth`, `curseforge`, `prism`, `multimc` and `generic`. Official installs still update `launcher_profiles.json`. Prism and MultiMC installs write `mmc-pack.json` plus `patches/space.nows.mcnows.json` so the instance launches with `space.nows.mcnows.runtime.NowsLauncher`. Modrinth, CurseForge and generic instance installs put mods in the selected instance game folder and write `nows/launcher-profile.properties`; native app launch support still depends on that launcher accepting custom Minecraft version ids.
+Supported launcher targets are `official`, `modrinth`, `curseforge`, `prism`, `multimc` and `generic`. Official installs still update `launcher_profiles.json`. Prism and MultiMC installs write `mmc-pack.json` plus `patches/space.nows.json` so the instance launches with `space.nows.loader.runtime.NowsLauncher`. Modrinth, CurseForge and generic instance installs put mods in the selected instance game folder and write `nows/launcher-profile.properties`; native app launch support still depends on that launcher accepting custom Minecraft version ids.
 
-Version-specific `space.nows.mcnows:nows-mc-*` adapter JARs are installed under the selected Minecraft root, but are not added to launcher-owned libraries. The generated profile passes `-Dnows.minecraftAdapterPath=<adapter.jar>` so the adapter is loaded inside Nows' game classloader alongside Minecraft, avoiding duplicate Minecraft classes across classloaders.
+Version-specific `space.nows:nows-mc-*` adapter JARs are installed under the selected Minecraft root, but are not added to launcher-owned libraries. The generated profile passes `-Dnows.minecraftAdapterPath=<adapter.jar>` so the adapter is loaded inside Nows' game classloader alongside Minecraft, avoiding duplicate Minecraft classes across classloaders.
 
 The profile icon is embedded from:
 
@@ -125,7 +125,7 @@ This JAR embeds the release manifest, Nows libraries and public runtime librarie
 Use the normal installer main class with `--offline` to test files already on disk. In local offline mode the installer never downloads the manifest or artifacts:
 
 ```bash
-java -cp build/libs/NowsInstaller-<version>.jar space.nows.mcnows.installer.NowsInstaller \
+java -cp build/libs/NowsInstaller-<version>.jar space.nows.installer.NowsInstaller \
   --offline \
   --manifest /path/to/install.properties \
   --artifactDir /path/to/offline-libraries \
@@ -135,7 +135,7 @@ java -cp build/libs/NowsInstaller-<version>.jar space.nows.mcnows.installer.Nows
 The local `install.properties` still uses the normal `artifact.*.path` values. For artifacts whose source is `internet`, place each JAR under `--artifactDir` using that same relative path, for example:
 
 ```text
-/path/to/offline-libraries/space/nows/mcnows/nows-core/0.5.0/nows-core-0.5.0.jar
+/path/to/offline-libraries/space/nows/nows-core/0.5.0/nows-core-0.5.0.jar
 ```
 
 Artifacts marked `source=embedded` are still copied from inside the installer JAR. A manifest may also set `artifact.<n>.source=local` and `artifact.<n>.file=relative/or/absolute.jar` for one-off local test jars.

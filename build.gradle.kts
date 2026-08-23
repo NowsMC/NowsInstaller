@@ -15,7 +15,7 @@ val jetbrainsAnnotationsVersion = providers.gradleProperty("jetbrains_annotation
 val minecraftVersion = providers.gradleProperty("minecraft_version")
 val nowsReleaseBaseUrl = providers.gradleProperty("nows_release_base_url")
 val kdl4jCoordinate = "com.github.kdl-org:kdl4j:v${kdl4jVersion.get()}"
-val installerMainClass = "space.nows.mcnows.installer.NowsInstallerGui"
+val installerMainClass = "space.nows.installer.NowsInstallerGui"
 
 fun compareVersionStrings(left: String, right: String): Int {
     val leftParts = left.split(".").map { it.toIntOrNull() ?: 0 }
@@ -125,15 +125,15 @@ fun sha256(file: File): String {
 }
 
 fun offlineModuleArtifactsFor(minecraft: String): Map<String, String> = mapOf(
-    ":core" to "space/nows/mcnows/nows-core/${project.version}/nows-core-${project.version}.jar",
-    ":minecraft" to "space/nows/mcnows/nows-minecraft/${project.version}/nows-minecraft-${project.version}.jar",
-    ":mc:$minecraft" to "space/nows/mcnows/nows-mc-$minecraft/${project.version}/nows-mc-$minecraft-${project.version}.jar",
-    ":integrations:kdl" to "space/nows/mcnows/nows-integration-kdl/${project.version}/nows-integration-kdl-${project.version}.jar",
-    ":integrations:geb" to "space/nows/mcnows/nows-integration-geb/${project.version}/nows-integration-geb-${project.version}.jar",
-    ":integrations:logging" to "space/nows/mcnows/nows-integration-logging/${project.version}/nows-integration-logging-${project.version}.jar",
-    ":integrations:network" to "space/nows/mcnows/nows-integration-network/${project.version}/nows-integration-network-${project.version}.jar",
-    ":integrations:mixin" to "space/nows/mcnows/nows-integration-mixin/${project.version}/nows-integration-mixin-${project.version}.jar",
-    ":runtime" to "space/nows/mcnows/nows-runtime/${project.version}/nows-runtime-${project.version}.jar"
+    ":core" to "space/nows/nows-core/${project.version}/nows-core-${project.version}.jar",
+    ":minecraft" to "space/nows/nows-minecraft/${project.version}/nows-minecraft-${project.version}.jar",
+    ":mc:$minecraft" to "space/nows/nows-mc-$minecraft/${project.version}/nows-mc-$minecraft-${project.version}.jar",
+    ":integrations:kdl" to "space/nows/nows-integration-kdl/${project.version}/nows-integration-kdl-${project.version}.jar",
+    ":integrations:geb" to "space/nows/nows-integration-geb/${project.version}/nows-integration-geb-${project.version}.jar",
+    ":integrations:logging" to "space/nows/nows-integration-logging/${project.version}/nows-integration-logging-${project.version}.jar",
+    ":integrations:network" to "space/nows/nows-integration-network/${project.version}/nows-integration-network-${project.version}.jar",
+    ":integrations:mixin" to "space/nows/nows-integration-mixin/${project.version}/nows-integration-mixin-${project.version}.jar",
+    ":runtime" to "space/nows/nows-runtime/${project.version}/nows-runtime-${project.version}.jar"
 )
 val offlineMavenArtifactPaths = mapOf(
     "core-${gebCoreVersion.get()}.jar" to "foo/zaaarf/geb/core/${gebCoreVersion.get()}/core-${gebCoreVersion.get()}.jar",
@@ -204,7 +204,7 @@ fun prepareOfflineInstallerManifestTask(minecraft: String) =
             offlineModuleArtifactsFor(minecraft).forEach { (projectPath, relativePath) ->
                 val index = offlineModuleArtifactIndex(projectPath, minecraft) ?: return@forEach
                 val artifactId = offlineModuleArtifactId(projectPath, minecraft)
-                manifest["artifact.$index.coordinate"] = "space.nows.mcnows:$artifactId:$nows"
+                manifest["artifact.$index.coordinate"] = "space.nows:$artifactId:$nows"
                 manifest["artifact.$index.path"] = relativePath
             }
             val count = manifest.getProperty("artifact.count").toInt()
@@ -316,7 +316,7 @@ val offlineJarTasks = supportedMinecraftVersions.associateWith { minecraft ->
                 .map { zipTree(it) }
         })
         from(offlinePayloadDir)
-        manifest { attributes("Main-Class" to "space.nows.mcnows.installer.NowsInstallerOffline") }
+        manifest { attributes("Main-Class" to "space.nows.installer.NowsInstallerOffline") }
     }
 }
 
