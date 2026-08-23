@@ -343,6 +343,12 @@ public final class NowsInstaller {
         json.append("{\n");
         json.append("  \"id\": ").append(quote(profile)).append(",\n");
         json.append("  \"inheritsFrom\": ").append(quote(options.minecraftVersion)).append(",\n");
+        MinecraftJavaRuntime javaRuntime = minecraftJavaRuntime(options.minecraftVersion);
+        json.append("  \"javaVersion\": {\"component\":")
+                .append(quote(javaRuntime.component))
+                .append(",\"majorVersion\":")
+                .append(javaRuntime.majorVersion)
+                .append("},\n");
         if (!hasProfileJar) {
             json.append("  \"jar\": ").append(quote(options.minecraftVersion)).append(",\n");
         } else {
@@ -391,6 +397,26 @@ public final class NowsInstaller {
 
         writeString(versionDir.resolve(profile + ".json"), json.toString());
         return profile;
+    }
+
+    static MinecraftJavaRuntime minecraftJavaRuntime(String minecraftVersion) {
+        if (minecraftVersion.startsWith("26.")) {
+            return new MinecraftJavaRuntime("java-runtime-epsilon", 25);
+        }
+        if (minecraftVersion.startsWith("1.21.") || minecraftVersion.equals("1.20.6")) {
+            return new MinecraftJavaRuntime("java-runtime-delta", 21);
+        }
+        return new MinecraftJavaRuntime("java-runtime-gamma", 17);
+    }
+
+    static final class MinecraftJavaRuntime {
+        final String component;
+        final int majorVersion;
+
+        MinecraftJavaRuntime(String component, int majorVersion) {
+            this.component = component;
+            this.majorVersion = majorVersion;
+        }
     }
 
     private static List<InstalledLibrary> launcherVisibleLibraries(List<InstalledLibrary> libraries) {
@@ -1669,7 +1695,7 @@ public final class NowsInstaller {
                     manifest,
                     launcher,
                     instanceDir,
-                    false,
+                    true,
                     artifactDir,
                     resource,
                     true,

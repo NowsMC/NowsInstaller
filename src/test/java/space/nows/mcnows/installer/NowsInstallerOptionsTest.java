@@ -124,6 +124,55 @@ class NowsInstallerOptionsTest {
     }
 
     @Test
+    void officialLauncherProfilesRequestJavaRuntimeForEverySupportedVersion() throws Exception {
+        for (String minecraftVersion : NowsInstaller.supportedMinecraftVersions()) {
+            Path manifest = temp.resolve("java-runtime-" + minecraftVersion + ".properties");
+            writeManifest(manifest, minecraftVersion);
+
+            Path minecraftDir = temp.resolve("java-runtime-official-" + minecraftVersion);
+            NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
+                    "--offline",
+                    "--manifest", manifest.toString(),
+                    "--nows", "0.6.2",
+                    "--minecraft", minecraftVersion,
+                    "--minecraftDir", minecraftDir.toString()
+            }), message -> {});
+
+            String profileJson = new String(Files.readAllBytes(minecraftDir
+                    .resolve("versions")
+                    .resolve("nows-0.6.2-" + minecraftVersion)
+                    .resolve("nows-0.6.2-" + minecraftVersion + ".json")), StandardCharsets.UTF_8);
+            NowsInstaller.MinecraftJavaRuntime runtime = NowsInstaller.minecraftJavaRuntime(minecraftVersion);
+            assertTrue(profileJson.contains("\"javaVersion\": {\"component\":\"" + runtime.component
+                            + "\",\"majorVersion\":" + runtime.majorVersion + "}"),
+                    minecraftVersion + " official launcher profile must request the Nows-compatible Java runtime");
+        }
+    }
+
+    @Test
+    void minecraftJavaRuntimeMatchesKnownLauncherFamilies() {
+        assertEquals(17, NowsInstaller.minecraftJavaRuntime("1.16.5").majorVersion);
+        assertEquals("java-runtime-gamma", NowsInstaller.minecraftJavaRuntime("1.16.5").component);
+        assertEquals(17, NowsInstaller.minecraftJavaRuntime("1.20.1").majorVersion);
+        assertEquals(21, NowsInstaller.minecraftJavaRuntime("1.20.6").majorVersion);
+        assertEquals(21, NowsInstaller.minecraftJavaRuntime("1.21.11").majorVersion);
+        assertEquals(25, NowsInstaller.minecraftJavaRuntime("26.2").majorVersion);
+        assertEquals("java-runtime-epsilon", NowsInstaller.minecraftJavaRuntime("26.2").component);
+    }
+
+    @Test
+    void embeddedOfflinePayloadKeepsInstallerOffline() throws Exception {
+        NowsInstaller.Options options = NowsInstaller.Options.parse(new String[] {
+                "--minecraftDir", temp.resolve("minecraft").toString()
+        }).withEmbeddedOfflinePayload();
+
+        assertTrue(options.offline);
+        assertTrue(options.embeddedArtifacts);
+        assertEquals("0.6.2", options.nowsVersion);
+        assertEquals("1.20.1", options.minecraftVersion);
+    }
+
+    @Test
     void prismAndMultiMcDefaultToDotMinecraftInsideInstance() {
         Path instanceDir = temp.resolve("PrismInstance");
 
