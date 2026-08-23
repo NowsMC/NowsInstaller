@@ -449,7 +449,10 @@ public final class NowsInstaller {
         }
 
         if (options.offline) {
-            return false;
+            throw new IOException("Minecraft " + options.minecraftVersion
+                    + " local client jar is missing. Offline Nows installs need an existing Minecraft client jar "
+                    + "so the installer can prepare the Mojang-named profile jar; run vanilla Minecraft "
+                    + options.minecraftVersion + " once or run the internet installer once for this version.");
         }
 
         Map<String, Object> versionJson = resolveMojangVersion(options.minecraftVersion);

@@ -6,6 +6,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -71,6 +73,7 @@ class NowsInstallerOptionsTest {
         assertFalse(options.writesLauncherProfile());
         assertTrue(options.writesMultiMcPack());
 
+        writeNamedMinecraftJar(minecraftDir, "1.20.1");
         NowsInstaller.install(options, message -> {});
 
         String pack = new String(Files.readAllBytes(instanceDir.resolve("mmc-pack.json")), StandardCharsets.UTF_8);
@@ -92,6 +95,7 @@ class NowsInstallerOptionsTest {
             writeManifest(manifest, minecraftVersion);
 
             Path minecraftDir = temp.resolve("official-" + minecraftVersion);
+            writeNamedMinecraftJar(minecraftDir, minecraftVersion);
             NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
                     "--offline",
                     "--manifest", manifest.toString(),
@@ -107,6 +111,7 @@ class NowsInstallerOptionsTest {
 
             Path prismMinecraftDir = temp.resolve("prism-root-" + minecraftVersion);
             Path instanceDir = temp.resolve("prism-instance-" + minecraftVersion);
+            writeNamedMinecraftJar(prismMinecraftDir, minecraftVersion);
             NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
                     "--offline",
                     "--manifest", manifest.toString(),
@@ -130,6 +135,7 @@ class NowsInstallerOptionsTest {
             writeManifest(manifest, minecraftVersion);
 
             Path minecraftDir = temp.resolve("java-runtime-official-" + minecraftVersion);
+            writeNamedMinecraftJar(minecraftDir, minecraftVersion);
             NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
                     "--offline",
                     "--manifest", manifest.toString(),
@@ -158,6 +164,23 @@ class NowsInstallerOptionsTest {
         assertEquals(21, NowsInstaller.minecraftJavaRuntime("1.21.11").majorVersion);
         assertEquals(25, NowsInstaller.minecraftJavaRuntime("26.2").majorVersion);
         assertEquals("java-runtime-epsilon", NowsInstaller.minecraftJavaRuntime("26.2").component);
+    }
+
+    @Test
+    void offlineOfficialInstallFailsWithoutLocalMinecraftClientJar() throws Exception {
+        Path manifest = temp.resolve("missing-client.properties");
+        writeManifest(manifest, "1.18.2");
+
+        Exception thrown = assertThrows(Exception.class, () ->
+                NowsInstaller.install(NowsInstaller.Options.parse(new String[] {
+                        "--offline",
+                        "--manifest", manifest.toString(),
+                        "--nows", "0.6.2",
+                        "--minecraft", "1.18.2",
+                        "--minecraftDir", temp.resolve("missing-client-minecraft").toString()
+                }), message -> {}));
+
+        assertTrue(thrown.getMessage().contains("local client jar is missing"));
     }
 
     @Test
@@ -219,6 +242,17 @@ class NowsInstallerOptionsTest {
                 + "/0.6.2/nows-mc-" + minecraftVersion + "-0.6.2.jar\n"
                 + "artifact.1.source=local\n"
                 + "mod.count=0\n").getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void writeNamedMinecraftJar(Path minecraftDir, String minecraftVersion) throws Exception {
+        Path jar = minecraftDir.resolve("versions").resolve(minecraftVersion).resolve(minecraftVersion + ".jar");
+        Files.createDirectories(jar.getParent());
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            output.putNextEntry(new JarEntry("net/minecraft/client/Minecraft.class"));
+            output.closeEntry();
+            output.putNextEntry(new JarEntry("net/minecraft/client/main/Main.class"));
+            output.closeEntry();
+        }
     }
 
     private static void assertLauncherMetadataUsesAdapterPath(String metadata, String minecraftVersion) {
