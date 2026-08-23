@@ -1,8 +1,8 @@
 # NowsInstaller
 
-Internet-first Official Launcher installer for Nows, plus a separate offline installer JAR with embedded Nows artifacts.
+Internet-first installer for Nows, plus per-Minecraft offline installer JARs with embedded Nows artifacts.
 
-The installer itself contains no loader architecture. It reads `install.properties` from `files.nows.space`, installs each declared artifact under `.minecraft/libraries`, writes an inherited Launcher version whose `mainClass` is `space.nows.mcnows.runtime.NowsLauncher`, then merges a Nows installation entry into `launcher_profiles.json`.
+The installer itself contains no loader architecture. It reads `install.properties` from `files.nows.space`, installs each declared artifact under the selected Minecraft root's `libraries` directory, writes an inherited Launcher version whose `mainClass` is `space.nows.mcnows.runtime.NowsLauncher`, then either merges a Nows installation entry into `launcher_profiles.json` or writes an instance reference for third-party launchers.
 
 The installer is compiled with Java 8 bytecode so it can run on Java 8 and newer.
 
@@ -34,6 +34,17 @@ Use `--profileGameDir` from the command line, or the UI's advanced options butto
 
 The installer UI is the normal user-facing entrypoint. It lets players choose a supported Minecraft version, auto-detects the main Minecraft folder for Windows, macOS and Linux, and keeps the optional profile game folder behind a small advanced options button.
 
+For launcher-managed instances, choose the launcher target in the UI or use the CLI:
+
+```bash
+java -jar NowsInstallerOffline-<version>-mc-<minecraft-version>.jar \
+  --launcher modrinth \
+  --minecraftDir /path/to/minecraft-root \
+  --instanceDir /path/to/modrinth/profile
+```
+
+Supported launcher targets are `official`, `modrinth`, `curseforge`, `prism`, `multimc` and `generic`. Official installs still update `launcher_profiles.json`. Instance installs put mods in the selected instance game folder and write `nows/launcher-profile.properties` with the generated Nows version id so launchers that do not read `launcher_profiles.json` can be pointed at `nows-<nows-version>-<minecraft-version>`.
+
 The profile icon is embedded from:
 
 ```text
@@ -46,11 +57,17 @@ src/main/resources/META-INF/nows/branding/nows.png
 ./gradlew :repos:NowsInstaller:assemble
 ```
 
-This builds the normal user-facing installer and one offline installer for the configured default Minecraft target:
+This builds the normal user-facing installer and offline installers for every supported Minecraft target:
 
 ```text
 build/libs/NowsInstaller-<version>.jar
 build/libs/NowsInstallerOffline-<version>-mc-<minecraft-version>.jar
+```
+
+To build only the offline installer set:
+
+```bash
+./gradlew :repos:NowsInstaller:allOfflineJars
 ```
 
 Run the installer with:
@@ -93,7 +110,7 @@ The manifest may also include `mod.<n>` companion mod entries. These are copied 
 
 The same installer selects the target Minecraft version at runtime and downloads the matching release manifest from `files.nows.space`.
 
-The offline installer is published beside it:
+Offline installers are published beside it, one per supported Minecraft version:
 
 ```text
 .publishing/releases/nows/<nows-version>/installers/NowsInstallerOffline-<nows-version>-mc-<minecraft-version>.jar

@@ -39,11 +39,29 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 public final class NowsInstallerGui {
+    private static final String OFFICIAL_LAUNCHER = "Official Minecraft Launcher";
+    private static final String MODRINTH_LAUNCHER = "Modrinth App";
+    private static final String CURSEFORGE_LAUNCHER = "CurseForge App";
+    private static final String PRISM_LAUNCHER = "Prism Launcher";
+    private static final String MULTIMC_LAUNCHER = "MultiMC";
+    private static final String GENERIC_LAUNCHER = "Generic instance";
+    private static final String[] LAUNCHERS = {
+            OFFICIAL_LAUNCHER,
+            MODRINTH_LAUNCHER,
+            CURSEFORGE_LAUNCHER,
+            PRISM_LAUNCHER,
+            MULTIMC_LAUNCHER,
+            GENERIC_LAUNCHER
+    };
+
     private final JFrame frame = new JFrame("Nows Installer");
     private final JLabel nowsVersion = new JLabel(NowsInstaller.defaultNowsVersion());
     private final JComboBox<String> minecraftVersion = new JComboBox<>(
             NowsInstaller.supportedMinecraftVersions().toArray(new String[0]));
     private final JTextField minecraftDir = new JTextField(defaultMinecraftDir());
+    private final JComboBox<String> launcher = new JComboBox<>(LAUNCHERS);
+    private final JTextField instanceDir = new JTextField();
+    private final JButton instanceDirBrowse = new JButton("Browse");
     private final JTextField gameDir = new JTextField(defaultGameDir());
     private final JCheckBox profileGameDir = new JCheckBox("Use a separate game folder for this Nows profile");
     private final JButton gameDirBrowse = new JButton("Browse");
@@ -64,6 +82,12 @@ public final class NowsInstallerGui {
         frame.getRootPane().setDefaultButton(install);
 
         profileGameDir.addActionListener(event -> updateGameDirFields());
+        launcher.addActionListener(event -> {
+            updateLauncherFields();
+            updateDefaultGameDir();
+            updateInstallHint();
+        });
+        instanceDirBrowse.addActionListener(event -> choose(instanceDir, JFileChooser.DIRECTORIES_ONLY));
         gameDirBrowse.addActionListener(event -> choose(gameDir, JFileChooser.DIRECTORIES_ONLY));
         minecraftVersion.addActionListener(event -> updateDefaultGameDir());
         minecraftDir.getDocument().addDocumentListener(new SimpleDocumentListener() {
@@ -74,6 +98,15 @@ public final class NowsInstallerGui {
                 updateInstallHint();
             }
         });
+        instanceDir.getDocument().addDocumentListener(new SimpleDocumentListener() {
+            @Override
+            public void update() {
+                updateLauncherFields();
+                updateDefaultGameDir();
+                updateInstallHint();
+            }
+        });
+        updateLauncherFields();
         updateGameDirFields();
         updateMinecraftDirStatus();
         updateInstallHint();
@@ -106,14 +139,16 @@ public final class NowsInstallerGui {
         addRow(panel, 0, "Nows version", nowsVersion, null);
         addRow(panel, 1, "Minecraft version", minecraftVersion, null);
         addRow(panel, 2, "Minecraft folder", minecraftDir, minecraftDirButtons());
+        addRow(panel, 3, "Launcher", launcher, null);
+        addRow(panel, 4, "Instance folder", instanceDir, buttonPanel(instanceDirBrowse));
 
-        GridBagConstraints statusGbc = constraints(3, 1);
+        GridBagConstraints statusGbc = constraints(5, 1);
         statusGbc.gridwidth = 2;
         statusGbc.fill = GridBagConstraints.HORIZONTAL;
         minecraftDirStatus.setVerticalAlignment(SwingConstants.TOP);
         panel.add(minecraftDirStatus, statusGbc);
 
-        GridBagConstraints hintGbc = constraints(4, 1);
+        GridBagConstraints hintGbc = constraints(6, 1);
         hintGbc.gridwidth = 2;
         hintGbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(installHint, hintGbc);
@@ -144,6 +179,12 @@ public final class NowsInstallerGui {
 
         Path minecraftPath = selectedMinecraftDir();
         if (minecraftPath == null || !confirmMinecraftDir(minecraftPath)) {
+            install.setEnabled(true);
+            return;
+        }
+        if (!selectedLauncherId().equals("official") && selectedInstanceDirQuietly() == null) {
+            JOptionPane.showMessageDialog(frame, "Choose an instance folder for " + launcher.getSelectedItem() + ".",
+                    "Instance folder required", JOptionPane.WARNING_MESSAGE);
             install.setEnabled(true);
             return;
         }
@@ -190,6 +231,10 @@ public final class NowsInstallerGui {
         addOption(args, "--nows", nowsVersion.getText());
         addOption(args, "--minecraft", selectedMinecraftVersion());
         addOption(args, "--minecraftDir", minecraftDir.getText());
+        if (!selectedLauncherId().equals("official")) {
+            addOption(args, "--launcher", selectedLauncherId());
+            addOption(args, "--instanceDir", instanceDir.getText());
+        }
         if (profileGameDir.isSelected()) {
             addOption(args, "--gameDir", gameDir.getText());
         }
@@ -334,6 +379,12 @@ public final class NowsInstallerGui {
         }
     }
 
+    private void updateLauncherFields() {
+        boolean instanceLauncher = !selectedLauncherId().equals("official");
+        instanceDir.setEnabled(instanceLauncher);
+        instanceDirBrowse.setEnabled(instanceLauncher);
+    }
+
     private void updateDefaultGameDir() {
         if (!profileGameDir.isSelected()) {
             gameDir.setText(defaultGameDir());
@@ -356,7 +407,15 @@ public final class NowsInstallerGui {
     private void updateInstallHint() {
         Path path = selectedMinecraftDirQuietly();
         String folder = path == null ? "the selected Minecraft folder" : path.toString();
-        installHint.setText("Normal install uses " + folder + " as the game folder. Profile folder is optional.");
+        if (selectedLauncherId().equals("official")) {
+            installHint.setText("Normal install uses " + folder + " as the game folder. Profile folder is optional.");
+            return;
+        }
+        Path instance = selectedInstanceDirQuietly();
+        String gameFolder = instance == null
+                ? "the selected instance folder"
+                : NowsInstaller.instanceGameDirectory(selectedLauncherId(), instance).toString();
+        installHint.setText("Instance install writes Nows libraries to " + folder + " and mods to " + gameFolder + ".");
     }
 
     private Path selectedMinecraftDir() {
@@ -370,6 +429,14 @@ public final class NowsInstallerGui {
 
     private Path selectedMinecraftDirQuietly() {
         String value = minecraftDir.getText();
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return Paths.get(value.trim()).toAbsolutePath().normalize();
+    }
+
+    private Path selectedInstanceDirQuietly() {
+        String value = instanceDir.getText();
         if (value == null || value.trim().isEmpty()) {
             return null;
         }
@@ -425,7 +492,34 @@ public final class NowsInstallerGui {
         return selected == null ? NowsInstaller.defaultMinecraftVersion() : selected.toString();
     }
 
+    private String selectedLauncherId() {
+        Object selected = launcher.getSelectedItem();
+        String value = selected == null ? OFFICIAL_LAUNCHER : selected.toString();
+        if (MODRINTH_LAUNCHER.equals(value)) {
+            return "modrinth";
+        }
+        if (CURSEFORGE_LAUNCHER.equals(value)) {
+            return "curseforge";
+        }
+        if (PRISM_LAUNCHER.equals(value)) {
+            return "prism";
+        }
+        if (MULTIMC_LAUNCHER.equals(value)) {
+            return "multimc";
+        }
+        if (GENERIC_LAUNCHER.equals(value)) {
+            return "generic";
+        }
+        return "official";
+    }
+
     private String defaultGameDir() {
+        if (!selectedLauncherId().equals("official")) {
+            Path instance = selectedInstanceDirQuietly();
+            if (instance != null) {
+                return NowsInstaller.instanceGameDirectory(selectedLauncherId(), instance).toString();
+            }
+        }
         Path base = selectedMinecraftDirQuietly();
         if (base == null) {
             base = NowsInstaller.defaultMinecraftDir();
