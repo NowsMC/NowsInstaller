@@ -439,13 +439,18 @@ public final class NowsInstaller {
     }
 
     private static boolean prepareMinecraftClientJar(Options options, Path target) throws Exception {
-        if (Files.isRegularFile(target) && MinecraftJarRemapper.containsNamedMinecraft(target)) {
-            return true;
-        }
-
         Path inherited = inheritedVersionJar(options);
         if (Files.isRegularFile(inherited)) {
             return prepareMinecraftClientJar(options, inherited, null, target);
+        }
+
+        Path cached = minecraftCacheDir(options).resolve("client-runtime.jar");
+        if (Files.isRegularFile(cached)) {
+            return prepareMinecraftClientJar(options, cached, null, target);
+        }
+
+        if (Files.isRegularFile(target) && MinecraftJarRemapper.containsNamedMinecraft(target)) {
+            return true;
         }
 
         if (options.offline) {
@@ -459,7 +464,6 @@ public final class NowsInstaller {
         DownloadSpec client = DownloadSpec.from(jsonObject(
                 jsonObject(versionJson.get("downloads"), "downloads").get("client"),
                 "downloads.client"));
-        Path cached = minecraftCacheDir(options).resolve("client-runtime.jar");
         downloadVerified(client, cached);
         return prepareMinecraftClientJar(options, cached, versionJson, target);
     }
@@ -476,23 +480,24 @@ public final class NowsInstaller {
             return true;
         }
 
-        if (options.offline) {
-            throw new IOException("Minecraft " + options.minecraftVersion
-                    + " uses an obfuscated client jar. Preparing a Mojang-named local profile jar requires "
-                    + "Mojang's official client mappings; run the internet installer once for this Minecraft version.");
-        }
-
-        if (versionJson == null) {
-            versionJson = resolveMojangVersion(options.minecraftVersion);
-        }
-        Object mappingObject = jsonObject(versionJson.get("downloads"), "downloads").get("client_mappings");
-        if (mappingObject == null) {
-            throw new IOException("Minecraft " + options.minecraftVersion + " has no official client mappings");
-        }
-
-        DownloadSpec mappings = DownloadSpec.from(jsonObject(mappingObject, "downloads.client_mappings"));
         Path mappingFile = minecraftCacheDir(options).resolve("client_mappings.txt");
-        downloadVerified(mappings, mappingFile);
+        if (!Files.isRegularFile(mappingFile)) {
+            if (options.offline) {
+                throw new IOException("Minecraft " + options.minecraftVersion
+                        + " uses an obfuscated client jar. Preparing a Mojang-named local profile jar requires "
+                        + "Mojang's official client mappings; run the internet installer once for this Minecraft version.");
+            }
+            if (versionJson == null) {
+                versionJson = resolveMojangVersion(options.minecraftVersion);
+            }
+            Object mappingObject = jsonObject(versionJson.get("downloads"), "downloads").get("client_mappings");
+            if (mappingObject == null) {
+                throw new IOException("Minecraft " + options.minecraftVersion + " has no official client mappings");
+            }
+
+            DownloadSpec mappings = DownloadSpec.from(jsonObject(mappingObject, "downloads.client_mappings"));
+            downloadVerified(mappings, mappingFile);
+        }
         MinecraftJarRemapper.remapOfficial(source, mappingFile, target);
         if (!MinecraftJarRemapper.containsNamedMinecraft(target)) {
             Files.deleteIfExists(target);
