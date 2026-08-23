@@ -139,16 +139,14 @@ public final class NowsInstallerGui {
         addRow(panel, 0, "Nows version", nowsVersion, null);
         addRow(panel, 1, "Minecraft version", minecraftVersion, null);
         addRow(panel, 2, "Minecraft folder", minecraftDir, minecraftDirButtons());
-        addRow(panel, 3, "Launcher", launcher, null);
-        addRow(panel, 4, "Instance folder", instanceDir, buttonPanel(instanceDirBrowse));
 
-        GridBagConstraints statusGbc = constraints(5, 1);
+        GridBagConstraints statusGbc = constraints(3, 1);
         statusGbc.gridwidth = 2;
         statusGbc.fill = GridBagConstraints.HORIZONTAL;
         minecraftDirStatus.setVerticalAlignment(SwingConstants.TOP);
         panel.add(minecraftDirStatus, statusGbc);
 
-        GridBagConstraints hintGbc = constraints(6, 1);
+        GridBagConstraints hintGbc = constraints(4, 1);
         hintGbc.gridwidth = 2;
         hintGbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(installHint, hintGbc);
@@ -322,10 +320,13 @@ public final class NowsInstallerGui {
         panel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
         JPanel fields = new JPanel(new GridBagLayout());
-        GridBagConstraints profileGbc = constraints(0, 0);
+        addRow(fields, 0, "Launcher", launcher, null);
+        addRow(fields, 1, "Instance folder", instanceDir, buttonPanel(instanceDirBrowse));
+
+        GridBagConstraints profileGbc = constraints(2, 0);
         profileGbc.gridwidth = 3;
         fields.add(profileGameDir, profileGbc);
-        addRow(fields, 1, "Profile game folder", gameDir, buttonPanel(gameDirBrowse));
+        addRow(fields, 3, "Profile game folder", gameDir, buttonPanel(gameDirBrowse));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         JButton done = new JButton("Done");

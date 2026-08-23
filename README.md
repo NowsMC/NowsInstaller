@@ -32,7 +32,7 @@ By default, the launcher profile does not set `gameDir`, so the game runs on the
 
 Use `--profileGameDir` from the command line, or the UI's advanced options button, to make the launcher profile use `.minecraft/nows/profiles/nows-<nows-version>-<minecraft-version>/` as its game folder. Use `--gameDir <path>` to choose a custom folder.
 
-The installer UI is the normal user-facing entrypoint. It lets players choose a supported Minecraft version, auto-detects the main Minecraft folder for Windows, macOS and Linux, and keeps the optional profile game folder behind a small advanced options button.
+The installer UI is the normal user-facing entrypoint. It lets players choose a supported Minecraft version, auto-detects the main Minecraft folder for Windows, macOS and Linux, and keeps launcher/instance options behind a small advanced options button.
 
 For launcher-managed instances, choose the launcher target in the UI or use the CLI:
 
@@ -43,7 +43,7 @@ java -jar NowsInstallerOffline-<version>-mc-<minecraft-version>.jar \
   --instanceDir /path/to/modrinth/profile
 ```
 
-Supported launcher targets are `official`, `modrinth`, `curseforge`, `prism`, `multimc` and `generic`. Official installs still update `launcher_profiles.json`. Instance installs put mods in the selected instance game folder and write `nows/launcher-profile.properties` with the generated Nows version id so launchers that do not read `launcher_profiles.json` can be pointed at `nows-<nows-version>-<minecraft-version>`.
+Supported launcher targets are `official`, `modrinth`, `curseforge`, `prism`, `multimc` and `generic`. Official installs still update `launcher_profiles.json`. Prism and MultiMC installs write `mmc-pack.json` plus `patches/space.nows.mcnows.json` so the instance launches with `space.nows.mcnows.runtime.NowsLauncher`. Modrinth, CurseForge and generic instance installs put mods in the selected instance game folder and write `nows/launcher-profile.properties`; native app launch support still depends on that launcher accepting custom Minecraft version ids.
 
 The profile icon is embedded from:
 
