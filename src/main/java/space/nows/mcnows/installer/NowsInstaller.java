@@ -359,8 +359,9 @@ public final class NowsInstaller {
         json.append("  \"releaseTime\": ").append(quote(now.toString())).append(",\n");
         json.append("  \"libraries\": [\n");
 
-        for (int i = 0; i < libraries.size(); i++) {
-            InstalledLibrary lib = libraries.get(i);
+        List<InstalledLibrary> launcherVisibleLibraries = launcherVisibleLibraries(libraries);
+        for (int i = 0; i < launcherVisibleLibraries.size(); i++) {
+            InstalledLibrary lib = launcherVisibleLibraries.get(i);
             json.append("    {\"name\":").append(quote(lib.coordinate())).append(",\"downloads\":{\"artifact\":{");
             json.append("\"path\":").append(quote(lib.relativePath())).append(',');
             json.append("\"sha1\":").append(quote(sha1(lib.file()))).append(',');
@@ -369,7 +370,7 @@ public final class NowsInstaller {
                 json.append(",\"url\":").append(quote(lib.sourceUrl()));
             }
             json.append("}}}");
-            if (i + 1 < libraries.size()) json.append(',');
+            if (i + 1 < launcherVisibleLibraries.size()) json.append(',');
             json.append('\n');
         }
 
@@ -380,12 +381,35 @@ public final class NowsInstaller {
         json.append("    \"jvm\": [");
         json.append(quote("-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector"));
         json.append(", ").append(quote("-Dnows.domain=nows.space"));
+        InstalledLibrary minecraftAdapter = minecraftAdapterLibrary(libraries);
+        if (minecraftAdapter != null) {
+            json.append(", ").append(quote("-Dnows.minecraftAdapterPath=" + minecraftAdapter.file()));
+        }
         json.append("]\n");
         json.append("  }\n");
         json.append("}\n");
 
         writeString(versionDir.resolve(profile + ".json"), json.toString());
         return profile;
+    }
+
+    private static List<InstalledLibrary> launcherVisibleLibraries(List<InstalledLibrary> libraries) {
+        List<InstalledLibrary> visible = new ArrayList<>();
+        for (InstalledLibrary library : libraries) {
+            if (!library.isMinecraftAdapter()) {
+                visible.add(library);
+            }
+        }
+        return visible;
+    }
+
+    private static InstalledLibrary minecraftAdapterLibrary(List<InstalledLibrary> libraries) {
+        for (InstalledLibrary library : libraries) {
+            if (library.isMinecraftAdapter()) {
+                return library;
+            }
+        }
+        return null;
     }
 
     private static boolean prepareMinecraftClientJar(Options options, Path target) throws Exception {
@@ -636,10 +660,18 @@ public final class NowsInstaller {
         jvmArgs.add("-Dnows.profileId=" + versionProfile);
         jvmArgs.add("-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
         jvmArgs.add("-Dnows.domain=nows.space");
+        InstalledLibrary minecraftAdapter = minecraftAdapterLibrary(libraries);
+        if (minecraftAdapter != null) {
+            jvmArgs.add("-Dnows.minecraftAdapterPath="
+                    + options.instanceDir.resolve("libraries").resolve(minecraftAdapter.file().getFileName()));
+        }
         patch.put("+jvmArgs", jvmArgs);
 
         List<Object> patchLibraries = new ArrayList<>();
         for (InstalledLibrary library : libraries) {
+            if (library.isMinecraftAdapter()) {
+                continue;
+            }
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("name", library.coordinate());
             entry.put("MMC-hint", "local");
@@ -1058,6 +1090,10 @@ public final class NowsInstaller {
             versions.add(0, fallback);
         }
         return versions;
+    }
+
+    static Properties embeddedOfflineManifest() throws IOException {
+        return loadEmbeddedProperties("/META-INF/nows/offline/install.properties");
     }
 
     static Path defaultMinecraftDir() {
@@ -1500,6 +1536,10 @@ public final class NowsInstaller {
         String relativePath() { return relativePath; }
         String sourceUrl() { return sourceUrl; }
         Path file() { return file; }
+
+        boolean isMinecraftAdapter() {
+            return coordinate.startsWith("space.nows.mcnows:nows-mc-");
+        }
     }
 
     private static final class DownloadSpec {

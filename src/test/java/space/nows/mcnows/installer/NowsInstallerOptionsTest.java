@@ -56,12 +56,20 @@ class NowsInstallerOptionsTest {
         Path minecraftDir = temp.resolve("minecraft-root");
         Path instanceDir = temp.resolve("PrismInstance");
         Path manifest = temp.resolve("install.properties");
+        writeArtifact("space/nows/mcnows/nows-runtime/0.6.2/nows-runtime-0.6.2.jar");
+        writeArtifact("space/nows/mcnows/nows-mc-1.20.1/0.6.2/nows-mc-1.20.1-0.6.2.jar");
         Files.write(manifest, (""
                 + "format=1\n"
                 + "nows.version=0.6.2\n"
                 + "minecraft.version=1.20.1\n"
                 + "mainClass=space.nows.mcnows.runtime.NowsLauncher\n"
-                + "artifact.count=0\n"
+                + "artifact.count=2\n"
+                + "artifact.0.coordinate=space.nows.mcnows:nows-runtime:0.6.2\n"
+                + "artifact.0.path=space/nows/mcnows/nows-runtime/0.6.2/nows-runtime-0.6.2.jar\n"
+                + "artifact.0.source=local\n"
+                + "artifact.1.coordinate=space.nows.mcnows:nows-mc-1.20.1:0.6.2\n"
+                + "artifact.1.path=space/nows/mcnows/nows-mc-1.20.1/0.6.2/nows-mc-1.20.1-0.6.2.jar\n"
+                + "artifact.1.source=local\n"
                 + "mod.count=0\n").getBytes(StandardCharsets.UTF_8));
 
         NowsInstaller.Options options = NowsInstaller.Options.parse(new String[] {
@@ -85,6 +93,50 @@ class NowsInstallerOptionsTest {
         assertTrue(patch.contains("\"mainClass\": \"space.nows.mcnows.runtime.NowsLauncher\""));
         assertTrue(patch.contains("-Dnows.minecraftVersion=1.20.1"));
         assertTrue(patch.contains("-Dnows.profileId=nows-0.6.2-1.20.1"));
+        assertTrue(patch.contains("-Dnows.minecraftAdapterPath="));
+        assertTrue(patch.contains("nows-mc-1.20.1-0.6.2.jar"));
+        assertTrue(patch.contains("\"name\": \"space.nows.mcnows:nows-runtime:0.6.2\""));
+        assertFalse(patch.contains("\"name\": \"space.nows.mcnows:nows-mc-1.20.1:0.6.2\""));
+    }
+
+    @Test
+    void officialProfileKeepsMinecraftAdapterOffLauncherClasspath() throws Exception {
+        Path minecraftDir = temp.resolve("minecraft-root");
+        Path manifest = temp.resolve("install.properties");
+        writeArtifact("space/nows/mcnows/nows-runtime/0.6.2/nows-runtime-0.6.2.jar");
+        writeArtifact("space/nows/mcnows/nows-mc-1.20.1/0.6.2/nows-mc-1.20.1-0.6.2.jar");
+        Files.write(manifest, (""
+                + "format=1\n"
+                + "nows.version=0.6.2\n"
+                + "minecraft.version=1.20.1\n"
+                + "mainClass=space.nows.mcnows.runtime.NowsLauncher\n"
+                + "artifact.count=2\n"
+                + "artifact.0.coordinate=space.nows.mcnows:nows-runtime:0.6.2\n"
+                + "artifact.0.path=space/nows/mcnows/nows-runtime/0.6.2/nows-runtime-0.6.2.jar\n"
+                + "artifact.0.source=local\n"
+                + "artifact.1.coordinate=space.nows.mcnows:nows-mc-1.20.1:0.6.2\n"
+                + "artifact.1.path=space/nows/mcnows/nows-mc-1.20.1/0.6.2/nows-mc-1.20.1-0.6.2.jar\n"
+                + "artifact.1.source=local\n"
+                + "mod.count=0\n").getBytes(StandardCharsets.UTF_8));
+
+        NowsInstaller.Options options = NowsInstaller.Options.parse(new String[] {
+                "--offline",
+                "--manifest", manifest.toString(),
+                "--nows", "0.6.2",
+                "--minecraft", "1.20.1",
+                "--minecraftDir", minecraftDir.toString()
+        });
+
+        NowsInstaller.install(options, message -> {});
+
+        String profileJson = new String(Files.readAllBytes(minecraftDir
+                .resolve("versions")
+                .resolve("nows-0.6.2-1.20.1")
+                .resolve("nows-0.6.2-1.20.1.json")), StandardCharsets.UTF_8);
+        assertTrue(profileJson.contains("\"name\":\"space.nows.mcnows:nows-runtime:0.6.2\""));
+        assertFalse(profileJson.contains("\"name\":\"space.nows.mcnows:nows-mc-1.20.1:0.6.2\""));
+        assertTrue(profileJson.contains("-Dnows.minecraftAdapterPath="));
+        assertTrue(profileJson.contains("nows-mc-1.20.1-0.6.2.jar"));
     }
 
     @Test
@@ -108,5 +160,11 @@ class NowsInstallerOptionsTest {
         Files.createDirectories(generic.resolve("minecraft").resolve("mods"));
         assertEquals(generic.resolve("minecraft").toAbsolutePath().normalize(),
                 NowsInstaller.instanceGameDirectory("generic", generic));
+    }
+
+    private void writeArtifact(String relativePath) throws Exception {
+        Path artifact = temp.resolve(relativePath);
+        Files.createDirectories(artifact.getParent());
+        Files.write(artifact, ("test artifact " + relativePath).getBytes(StandardCharsets.UTF_8));
     }
 }

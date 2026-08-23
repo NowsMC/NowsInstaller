@@ -32,7 +32,7 @@ By default, the launcher profile does not set `gameDir`, so the game runs on the
 
 Use `--profileGameDir` from the command line, or the UI's advanced options button, to make the launcher profile use `.minecraft/nows/profiles/nows-<nows-version>-<minecraft-version>/` as its game folder. Use `--gameDir <path>` to choose a custom folder.
 
-The installer UI is the normal user-facing entrypoint. It lets players choose a supported Minecraft version, auto-detects the main Minecraft folder for Windows, macOS and Linux, and keeps launcher/instance options behind a small advanced options button.
+The installer UI is the normal user-facing entrypoint. It lets players choose a supported Minecraft version, auto-detects the main Minecraft folder for Windows, macOS and Linux, and keeps launcher/instance options behind a small advanced options button. Offline installer JARs open the same UI, but lock the Minecraft version to the one bundled inside that offline package.
 
 For launcher-managed instances, choose the launcher target in the UI or use the CLI:
 
@@ -44,6 +44,8 @@ java -jar NowsInstallerOffline-<version>-mc-<minecraft-version>.jar \
 ```
 
 Supported launcher targets are `official`, `modrinth`, `curseforge`, `prism`, `multimc` and `generic`. Official installs still update `launcher_profiles.json`. Prism and MultiMC installs write `mmc-pack.json` plus `patches/space.nows.mcnows.json` so the instance launches with `space.nows.mcnows.runtime.NowsLauncher`. Modrinth, CurseForge and generic instance installs put mods in the selected instance game folder and write `nows/launcher-profile.properties`; native app launch support still depends on that launcher accepting custom Minecraft version ids.
+
+Version-specific `space.nows.mcnows:nows-mc-*` adapter JARs are installed under the selected Minecraft root, but are not added to launcher-owned libraries. The generated profile passes `-Dnows.minecraftAdapterPath=<adapter.jar>` so the adapter is loaded inside Nows' game classloader alongside Minecraft, avoiding duplicate Minecraft classes across classloaders.
 
 The profile icon is embedded from:
 
@@ -116,7 +118,7 @@ Offline installers are published beside it, one per supported Minecraft version:
 .publishing/releases/nows/<nows-version>/installers/NowsInstallerOffline-<nows-version>-mc-<minecraft-version>.jar
 ```
 
-This JAR embeds the release manifest, Nows libraries and public runtime libraries. It does not embed Minecraft client files. Run it without `--manifest` or `--artifactDir`; only launcher/profile options such as `--minecraftDir` and `--gameDir` are needed. If the target vanilla client is not already available locally, the installer may still contact Mojang's official services to prepare the local launcher profile.
+This JAR embeds the release manifest, Nows libraries and public runtime libraries. It does not embed Minecraft client files. Run it without `--manifest` or `--artifactDir`; the UI handles the common path and advanced launcher/profile options. For scripted installs, add `--cli` and pass options such as `--minecraftDir`, `--launcher`, `--instanceDir` and `--gameDir`. If the target vanilla client is not already available locally, the installer may still contact Mojang's official services to prepare the local launcher profile.
 
 ## Offline local testing
 

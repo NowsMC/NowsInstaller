@@ -10,7 +10,11 @@ public final class NowsInstallerOffline {
     private NowsInstallerOffline() {}
 
     public static void main(String[] args) throws Exception {
-        NowsInstaller.Options options = NowsInstaller.Options.parse(stripLocalOfflineOptions(args))
+        if (!hasCliFlag(args)) {
+            NowsInstallerGui.mainOffline(stripLocalOfflineOptions(args));
+            return;
+        }
+        NowsInstaller.Options options = NowsInstaller.Options.parse(stripLocalOfflineOptions(args, "--cli"))
                 .withEmbeddedOfflinePayload();
         NowsInstaller.install(options, new NowsInstaller.InstallerListener() {
             @Override
@@ -21,10 +25,14 @@ public final class NowsInstallerOffline {
     }
 
     private static String[] stripLocalOfflineOptions(String[] args) {
+        return stripLocalOfflineOptions(args, null);
+    }
+
+    private static String[] stripLocalOfflineOptions(String[] args, String extraFlag) {
         List<String> cleaned = new ArrayList<>();
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
-            if ("--offline".equals(arg)) {
+            if ("--offline".equals(arg) || arg.equals(extraFlag)) {
                 continue;
             }
             if ("--manifest".equals(arg) || "--artifactDir".equals(arg)) {
@@ -34,5 +42,14 @@ public final class NowsInstallerOffline {
             cleaned.add(arg);
         }
         return cleaned.toArray(new String[0]);
+    }
+
+    private static boolean hasCliFlag(String[] args) {
+        for (String arg : args) {
+            if ("--cli".equals(arg)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

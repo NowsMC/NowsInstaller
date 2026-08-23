@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import javax.imageio.ImageIO;
 import javax.net.ssl.SSLException;
 import javax.swing.BorderFactory;
@@ -70,12 +71,19 @@ public final class NowsInstallerGui {
     private final JLabel minecraftDirStatus = new JLabel(" ");
     private final JLabel installHint = new JLabel(" ");
     private final JTextArea log = new JTextArea();
+    private final boolean embeddedOffline;
 
     private NowsInstallerGui() {
+        this(false);
+    }
+
+    private NowsInstallerGui(boolean embeddedOffline) {
+        this.embeddedOffline = embeddedOffline;
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setMinimumSize(new Dimension(720, 460));
         frame.setLayout(new BorderLayout(12, 12));
         setWindowIcon();
+        configureEmbeddedOffline();
         frame.add(form(), BorderLayout.NORTH);
         frame.add(logPane(), BorderLayout.CENTER);
         frame.add(actions(), BorderLayout.SOUTH);
@@ -115,6 +123,14 @@ public final class NowsInstallerGui {
     }
 
     public static void main(String[] args) {
+        showGui(false);
+    }
+
+    static void mainOffline(String[] args) {
+        showGui(true);
+    }
+
+    private static void showGui(boolean embeddedOffline) {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -123,7 +139,7 @@ public final class NowsInstallerGui {
                 } catch (Exception ignored) {
                     // Swing falls back to the default look and feel.
                 }
-                new NowsInstallerGui().show();
+                new NowsInstallerGui(embeddedOffline).show();
             }
         });
     }
@@ -190,7 +206,11 @@ public final class NowsInstallerGui {
         new SwingWorker<Void, String>() {
             @Override
             protected Void doInBackground() throws Exception {
-                NowsInstaller.install(NowsInstaller.Options.parse(args), new NowsInstaller.InstallerListener() {
+                NowsInstaller.Options options = NowsInstaller.Options.parse(args);
+                if (embeddedOffline) {
+                    options = options.withEmbeddedOfflinePayload();
+                }
+                NowsInstaller.install(options, new NowsInstaller.InstallerListener() {
                     @Override
                     public void log(String message) {
                         publish(message);
@@ -237,6 +257,27 @@ public final class NowsInstallerGui {
             addOption(args, "--gameDir", gameDir.getText());
         }
         return args.toArray(new String[0]);
+    }
+
+    private void configureEmbeddedOffline() {
+        if (!embeddedOffline) {
+            return;
+        }
+        try {
+            Properties manifest = NowsInstaller.embeddedOfflineManifest();
+            String bundledNows = manifest.getProperty("nows.version", nowsVersion.getText()).trim();
+            String bundledMinecraft = manifest.getProperty("minecraft.version", selectedMinecraftVersion()).trim();
+            frame.setTitle("Nows Offline Installer");
+            install.setText("Install Nows Offline");
+            nowsVersion.setText(bundledNows);
+            minecraftVersion.removeAllItems();
+            minecraftVersion.addItem(bundledMinecraft);
+            minecraftVersion.setSelectedItem(bundledMinecraft);
+            minecraftVersion.setEnabled(false);
+            minecraftVersion.setToolTipText("Bundled for Minecraft " + bundledMinecraft);
+        } catch (IOException e) {
+            throw new IllegalStateException("Offline installer payload is missing", e);
+        }
     }
 
     private static void addOption(List<String> args, String name, String value) {
