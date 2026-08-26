@@ -47,6 +47,20 @@ Supported launcher targets are `official`, `modrinth`, `curseforge`, `prism`, `m
 
 Version-specific `space.nows:nows-mc-*` adapter JARs are installed under the selected Minecraft root, but are not added to launcher-owned libraries. The generated profile passes `-Dnows.minecraftAdapterPath=<adapter.jar>` so the adapter is loaded inside Nows' game classloader alongside Minecraft, avoiding duplicate Minecraft classes across classloaders.
 
+## Dedicated server install
+
+Use `--server` or `--target server` to install a runnable dedicated-server folder instead of a launcher profile:
+
+```bash
+java -jar NowsInstaller-<version>.jar \
+  --server \
+  --minecraft 1.20.1 \
+  --serverDir /path/to/nows-server \
+  --serverJar /path/to/minecraft-server.jar
+```
+
+The installer writes `run-nows-server.sh`, `run-nows-server.bat`, `mods/`, `config/nows/`, `nows/server.properties` and an `eula.txt` placeholder. It does not edit `launcher_profiles.json` and does not require a local Minecraft client JAR. If `--serverJar` is omitted, the scripts expect `server.jar` inside the server folder or `NOWS_SERVER_JAR` in the environment.
+
 The profile icon is embedded from:
 
 ```text

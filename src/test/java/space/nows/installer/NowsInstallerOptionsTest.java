@@ -70,6 +70,49 @@ class NowsInstallerOptionsTest {
     }
 
     @Test
+    void serverInstallWritesRunnableBatAndShWithoutClientJar() throws Exception {
+        Path serverDir = temp.resolve("server");
+        Path manifest = temp.resolve("server-install.properties");
+        writeManifest(manifest, "1.20.1");
+
+        NowsInstaller.Options options = NowsInstaller.Options.parse(new String[] {
+                "--offline",
+                "--manifest", manifest.toString(),
+                "--nows", "0.9.0",
+                "--minecraft", "1.20.1",
+                "--server",
+                "--serverDir", serverDir.toString()
+        });
+
+        assertTrue(options.serverInstall());
+        assertFalse(options.writesLauncherProfile());
+        assertFalse(options.writesMultiMcPack());
+
+        NowsInstaller.install(options, message -> {});
+
+        String sh = new String(Files.readAllBytes(serverDir.resolve("run-nows-server.sh")), StandardCharsets.UTF_8);
+        String bat = new String(Files.readAllBytes(serverDir.resolve("run-nows-server.bat")), StandardCharsets.UTF_8);
+        String config = new String(Files.readAllBytes(serverDir.resolve("nows").resolve("server.properties")),
+                StandardCharsets.UTF_8);
+        String eula = new String(Files.readAllBytes(serverDir.resolve("eula.txt")), StandardCharsets.UTF_8);
+
+        assertTrue(Files.isDirectory(serverDir.resolve("mods")));
+        assertTrue(Files.isDirectory(serverDir.resolve("config").resolve("nows")));
+        assertTrue(sh.contains("--nowsSide server"));
+        assertTrue(sh.contains("-Dnows.side=server"));
+        assertTrue(sh.contains("nogui"));
+        assertTrue(bat.contains("--nowsSide server"));
+        assertTrue(bat.contains("-Dnows.side=server"));
+        assertTrue(config.contains("side=server"));
+        assertTrue(config.contains("serverJar="));
+        assertTrue(eula.contains("eula=false"));
+        assertFalse(sh.contains("nows-mc-1.20.1-0.9.0.jar"));
+        assertFalse(bat.contains("nows-mc-1.20.1-0.9.0.jar"));
+        assertFalse(Files.exists(serverDir.resolve("versions")));
+        assertFalse(Files.exists(serverDir.resolve("launcher_profiles.json")));
+    }
+
+    @Test
     void prismLauncherWritesRunnablePackPatch() throws Exception {
         Path minecraftDir = temp.resolve("minecraft-root");
         Path instanceDir = temp.resolve("PrismInstance");
