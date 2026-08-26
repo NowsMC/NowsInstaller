@@ -95,17 +95,26 @@ class NowsInstallerOptionsTest {
         String config = new String(Files.readAllBytes(serverDir.resolve("nows").resolve("server.properties")),
                 StandardCharsets.UTF_8);
         String eula = new String(Files.readAllBytes(serverDir.resolve("eula.txt")), StandardCharsets.UTF_8);
+        String readme = new String(Files.readAllBytes(serverDir.resolve("README-NOWS-SERVER.txt")),
+                StandardCharsets.UTF_8);
 
         assertTrue(Files.isDirectory(serverDir.resolve("mods")));
         assertTrue(Files.isDirectory(serverDir.resolve("config").resolve("nows")));
         assertTrue(sh.contains("--nowsSide server"));
         assertTrue(sh.contains("-Dnows.side=server"));
+        assertTrue(sh.contains("cd \"$DIR\""));
+        assertTrue(sh.contains("eula=false to eula=true"));
         assertTrue(sh.contains("nogui"));
         assertTrue(bat.contains("--nowsSide server"));
         assertTrue(bat.contains("-Dnows.side=server"));
+        assertTrue(bat.contains("cd /d \"%DIR%\""));
+        assertTrue(bat.contains("eula=false to eula=true"));
         assertTrue(config.contains("side=server"));
         assertTrue(config.contains("serverJar="));
         assertTrue(eula.contains("eula=false"));
+        assertTrue(readme.contains("Installed files:"));
+        assertTrue(readme.contains("run-nows-server.sh"));
+        assertTrue(readme.contains("Before first run:"));
         assertFalse(sh.contains("nows-mc-1.20.1-0.9.0.jar"));
         assertFalse(bat.contains("nows-mc-1.20.1-0.9.0.jar"));
         assertFalse(Files.exists(serverDir.resolve("versions")));

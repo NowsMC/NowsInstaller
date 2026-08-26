@@ -124,6 +124,16 @@ public final class NowsInstaller {
                     + profileGameDirectory(options).resolve("nows").resolve("server.properties"));
             listener.log("[NowsInstaller] server run script: "
                     + profileGameDirectory(options).resolve("run-nows-server.sh"));
+            listener.log("[NowsInstaller] server run script: "
+                    + profileGameDirectory(options).resolve("run-nows-server.bat"));
+            listener.log("[NowsInstaller] server readme: "
+                    + profileGameDirectory(options).resolve("README-NOWS-SERVER.txt"));
+            if (Files.isRegularFile(serverJarPath(options))) {
+                listener.log("[NowsInstaller] server jar found: " + serverJarPath(options));
+            } else {
+                listener.log("[NowsInstaller] server jar missing: place server.jar in the server folder or set NOWS_SERVER_JAR");
+            }
+            listener.log("[NowsInstaller] server will start after eula.txt is changed to eula=true");
         } else {
             profile = installVersionJson(options, manifest, launcherLibraries);
             listener.log("[NowsInstaller] version json: "
@@ -445,6 +455,7 @@ public final class NowsInstaller {
         writeServerEulaPlaceholder(serverDir);
         writeServerProperties(options, manifest, libraries, profile);
         writeServerScripts(options, manifest, libraries, profile);
+        writeServerReadme(options, profile);
         return profile;
     }
 
@@ -512,11 +523,17 @@ public final class NowsInstaller {
                 + "#!/usr/bin/env sh\n"
                 + "set -eu\n"
                 + "DIR=$(CDPATH= cd -- \"$(dirname -- \"$0\")\" && pwd)\n"
+                + "cd \"$DIR\"\n"
                 + "JAVA=${JAVA:-java}\n"
                 + "SERVER_JAR=${NOWS_SERVER_JAR:-" + shellQuote(serverJarPath(options).toString()) + "}\n"
                 + "if [ ! -f \"$SERVER_JAR\" ]; then\n"
                 + "  echo \"Missing Minecraft server jar: $SERVER_JAR\" >&2\n"
                 + "  echo \"Set NOWS_SERVER_JAR=/path/to/server.jar or place server.jar in this folder.\" >&2\n"
+                + "  exit 1\n"
+                + "fi\n"
+                + "if ! grep -Eiq '^[[:space:]]*eula[[:space:]]*=[[:space:]]*true[[:space:]]*$' \"$DIR/eula.txt\"; then\n"
+                + "  echo \"Minecraft EULA is not accepted yet.\" >&2\n"
+                + "  echo \"Read eula.txt, then change eula=false to eula=true if you agree.\" >&2\n"
                 + "  exit 1\n"
                 + "fi\n"
                 + "CP=" + classpath + "\n"
@@ -549,12 +566,19 @@ public final class NowsInstaller {
                 + "@echo off\r\n"
                 + "setlocal\r\n"
                 + "set \"DIR=%~dp0\"\r\n"
+                + "cd /d \"%DIR%\"\r\n"
                 + "if not defined JAVA set \"JAVA=java\"\r\n"
                 + "if not defined NOWS_SERVER_JAR set \"NOWS_SERVER_JAR=" + serverJarPath(options) + "\"\r\n"
                 + "set \"SERVER_JAR=%NOWS_SERVER_JAR%\"\r\n"
                 + "if not exist \"%SERVER_JAR%\" (\r\n"
                 + "  echo Missing Minecraft server jar: %SERVER_JAR% 1>&2\r\n"
                 + "  echo Set NOWS_SERVER_JAR=C:\\path\\to\\server.jar or place server.jar in this folder. 1>&2\r\n"
+                + "  exit /b 1\r\n"
+                + ")\r\n"
+                + "findstr /I /R /C:\"^[ ]*eula[ ]*=[ ]*true[ ]*$\" \"%DIR%eula.txt\" >nul\r\n"
+                + "if errorlevel 1 (\r\n"
+                + "  echo Minecraft EULA is not accepted yet. 1>&2\r\n"
+                + "  echo Read eula.txt, then change eula=false to eula=true if you agree. 1>&2\r\n"
                 + "  exit /b 1\r\n"
                 + ")\r\n"
                 + "set \"CP=" + classpath + "\"\r\n"
@@ -570,6 +594,34 @@ public final class NowsInstaller {
                 + " --nowsSide server"
                 + " --nowsGameDir \"%DIR%\""
                 + " nogui %*\r\n";
+    }
+
+    private static void writeServerReadme(Options options, String profile) throws IOException {
+        Path serverDir = profileGameDirectory(options);
+        writeString(serverDir.resolve("README-NOWS-SERVER.txt"), ""
+                + "Nows dedicated server install\n"
+                + "\n"
+                + "Profile: " + profile + "\n"
+                + "Nows: " + options.nowsVersion + "\n"
+                + "Minecraft: " + options.minecraftVersion + "\n"
+                + "\n"
+                + "Installed files:\n"
+                + "- run-nows-server.sh: Linux/macOS launcher script.\n"
+                + "- run-nows-server.bat: Windows launcher script.\n"
+                + "- eula.txt: Mojang EULA marker. Generated as eula=false.\n"
+                + "- mods/: put Nows server mods here.\n"
+                + "- config/nows/: Nows config directory.\n"
+                + "- nows/server.properties: generated install metadata and classpath summary.\n"
+                + "- libraries/: installed Nows runtime libraries.\n"
+                + "\n"
+                + "Before first run:\n"
+                + "1. Put the Minecraft dedicated server jar at " + serverJarPath(options) + "\n"
+                + "   or set NOWS_SERVER_JAR to the server jar path.\n"
+                + "2. Read eula.txt. If you agree to Mojang's EULA, change eula=false to eula=true.\n"
+                + "3. Run ./run-nows-server.sh or run-nows-server.bat from this folder.\n"
+                + "\n"
+                + "The scripts cd into this folder before starting Minecraft, so world, logs and server.properties\n"
+                + "are written here instead of the terminal's original working directory.\n");
     }
 
     private static List<Path> serverRuntimeLibraries(List<InstalledLibrary> libraries) {
