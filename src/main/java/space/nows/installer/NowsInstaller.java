@@ -1186,7 +1186,8 @@ public final class NowsInstaller {
         for (int i = 0; i < location.length(); i++) {
             char c = location.charAt(i);
             if (c == ':') {
-                return i > 0;
+                // A single letter is a Windows drive ("C:\..."), not a URI scheme.
+                return i > 1;
             }
             if (!(Character.isLetterOrDigit(c) || c == '+' || c == '-' || c == '.')) {
                 return false;
